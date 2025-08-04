@@ -1,0 +1,153 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'kgv-monitor'
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # KGV API
+  - job_name: 'kgv-api'
+    static_configs:
+      - targets: ['kgv-api:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    scheme: http
+    params:
+      format: ['prometheus']
+
+  # PostgreSQL Exporter (if available)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Redis Exporter (if available)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # Node Exporter (if available)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Docker containers metrics (if available)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+
+# Recording rules for KGV-specific metrics
+recording_rules:
+  - name: kgv_rules
+    rules:
+      # HTTP request rate
+      - record: kgv:http_requests_per_second
+        expr: rate(http_requests_total[5m])
+        labels:
+          service: kgv-api
+
+      # Application error rate
+      - record: kgv:error_rate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])
+        labels:
+          service: kgv-api
+
+      # Database connection pool usage
+      - record: kgv:db_connection_pool_usage
+        expr: dotnet_db_connection_pool_active_connections / dotnet_db_connection_pool_max_connections
+        labels:
+          service: kgv-api
+
+      # Memory usage percentage
+      - record: kgv:memory_usage_percent
+        expr: (dotnet_total_memory_bytes / (dotnet_total_memory_bytes + dotnet_gc_heap_size_bytes)) * 100
+        labels:
+          service: kgv-api
+
+# Alerting rules for critical conditions
+alerting_rules:
+  - name: kgv_alerts
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: kgv:error_rate > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: kgv-api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      # High response time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_milliseconds_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: kgv-api
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}ms"
+
+      # Database connection issues
+      - alert: DatabaseConnectionIssues
+        expr: kgv:db_connection_pool_usage > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          service: kgv-api
+        annotations:
+          summary: "Database connection pool usage is high"
+          description: "Connection pool usage is {{ $value | humanizePercentage }}"
+
+      # Application down
+      - alert: ApplicationDown
+        expr: up{job="kgv-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: kgv-api
+        annotations:
+          summary: "KGV API is down"
+          description: "KGV API has been down for more than 1 minute"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: kgv:memory_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: kgv-api
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}%"
+
+      # High CPU usage
+      - alert: HighCpuUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: kgv-api
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}%"

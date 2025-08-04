@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  
+  <!-- Error Messages -->
+  <data name="Error_ApplicationNotFound" xml:space="preserve">
+    <value>Der Antrag mit der ID {0} wurde nicht gefunden.</value>
+  </data>
+  <data name="Error_ValidationFailed" xml:space="preserve">
+    <value>Die Validierung ist fehlgeschlagen. Bitte überprüfen Sie Ihre Eingaben.</value>
+  </data>
+  <data name="Error_DatabaseError" xml:space="preserve">
+    <value>Ein Datenbankfehler ist aufgetreten. Bitte versuchen Sie es später erneut.</value>
+  </data>
+  <data name="Error_UnauthorizedAccess" xml:space="preserve">
+    <value>Sie haben keine Berechtigung für diese Aktion.</value>
+  </data>
+  <data name="Error_InternalServerError" xml:space="preserve">
+    <value>Ein interner Serverfehler ist aufgetreten. Bitte wenden Sie sich an den Administrator.</value>
+  </data>
+  
+  <!-- Success Messages -->
+  <data name="Success_ApplicationCreated" xml:space="preserve">
+    <value>Der Antrag wurde erfolgreich erstellt.</value>
+  </data>
+  <data name="Success_ApplicationUpdated" xml:space="preserve">
+    <value>Der Antrag wurde erfolgreich aktualisiert.</value>
+  </data>
+  <data name="Success_ApplicationDeleted" xml:space="preserve">
+    <value>Der Antrag wurde erfolgreich gelöscht.</value>
+  </data>
+  <data name="Success_StatusUpdated" xml:space="preserve">
+    <value>Der Status wurde erfolgreich aktualisiert.</value>
+  </data>
+  
+  <!-- Field Labels -->
+  <data name="Field_ApplicationNumber" xml:space="preserve">
+    <value>Antragsnummer</value>
+  </data>
+  <data name="Field_FirstName" xml:space="preserve">
+    <value>Vorname</value>
+  </data>
+  <data name="Field_LastName" xml:space="preserve">
+    <value>Nachname</value>
+  </data>
+  <data name="Field_Address" xml:space="preserve">
+    <value>Adresse</value>
+  </data>
+  <data name="Field_PostalCode" xml:space="preserve">
+    <value>Postleitzahl</value>
+  </data>
+  <data name="Field_City" xml:space="preserve">
+    <value>Ort</value>
+  </data>
+  <data name="Field_Email" xml:space="preserve">
+    <value>E-Mail-Adresse</value>
+  </data>
+  <data name="Field_Phone" xml:space="preserve">
+    <value>Telefonnummer</value>
+  </data>
+  <data name="Field_MobilePhone" xml:space="preserve">
+    <value>Mobiltelefon</value>
+  </data>
+  <data name="Field_ApplicationDate" xml:space="preserve">
+    <value>Bewerbungsdatum</value>
+  </data>
+  <data name="Field_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Field_Notes" xml:space="preserve">
+    <value>Bemerkungen</value>
+  </data>
+  <data name="Field_Wishes" xml:space="preserve">
+    <value>Wünsche</value>
+  </data>
+  
+  <!-- Status Descriptions -->
+  <data name="Status_NewApplication" xml:space="preserve">
+    <value>Neu eingegangen</value>
+  </data>
+  <data name="Status_InProcessing" xml:space="preserve">
+    <value>In Bearbeitung</value>
+  </data>
+  <data name="Status_WaitingList" xml:space="preserve">
+    <value>Warteschlange</value>
+  </data>
+  <data name="Status_OfferMade" xml:space="preserve">
+    <value>Angebot gemacht</value>
+  </data>
+  <data name="Status_OfferAccepted" xml:space="preserve">
+    <value>Angebot angenommen</value>
+  </data>
+  <data name="Status_OfferDeclined" xml:space="preserve">
+    <value>Angebot abgelehnt</value>
+  </data>
+  <data name="Status_Completed" xml:space="preserve">
+    <value>Abgeschlossen</value>
+  </data>
+  <data name="Status_Cancelled" xml:space="preserve">
+    <value>Abgebrochen</value>
+  </data>
+  <data name="Status_Deactivated" xml:space="preserve">
+    <value>Deaktiviert</value>
+  </data>
+  
+  <!-- GDPR Related -->
+  <data name="GDPR_DataProcessingNotice" xml:space="preserve">
+    <value>Hinweis: Die Verarbeitung Ihrer personenbezogenen Daten erfolgt gemäß der Datenschutz-Grundverordnung (DSGVO).</value>
+  </data>
+  <data name="GDPR_DataRetentionNotice" xml:space="preserve">
+    <value>Ihre Daten werden für die Dauer der Bearbeitung Ihres Antrags und gemäß den gesetzlichen Aufbewahrungsfristen gespeichert.</value>
+  </data>
+  <data name="GDPR_RightToDataAccess" xml:space="preserve">
+    <value>Sie haben das Recht auf Auskunft über Ihre gespeicherten Daten.</value>
+  </data>
+  <data name="GDPR_RightToCorrection" xml:space="preserve">
+    <value>Sie haben das Recht auf Berichtigung unrichtiger Daten.</value>
+  </data>
+  <data name="GDPR_RightToDeletion" xml:space="preserve">
+    <value>Sie haben das Recht auf Löschung Ihrer Daten unter bestimmten Voraussetzungen.</value>
+  </data>
+</root>
