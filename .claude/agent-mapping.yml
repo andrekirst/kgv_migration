@@ -1,0 +1,427 @@
+# Sub-Agent Automatic Selection Configuration
+# This file defines rules for automatic sub-agent invocation in Claude Code
+
+# ===========================================
+# Mandatory Agent Usage (NEVER SKIP)
+# ===========================================
+
+mandatory_agents:
+  code_review:
+    agent: code-reviewer
+    trigger: "after_code_writing"
+    priority: critical
+    description: "MANDATORY after ANY code writing or modification"
+    
+  architecture_review:
+    agent: architect-reviewer
+    trigger: "after_structural_changes"
+    priority: critical
+    description: "MANDATORY after new services, APIs, or architectural changes"
+    
+  debug_support:
+    agent: debugger
+    trigger: "on_errors_or_issues"
+    priority: critical
+    description: "MANDATORY when encountering errors, test failures, or unexpected behavior"
+    
+  security_audit:
+    agent: security-auditor
+    trigger: "on_security_relevant_code"
+    priority: critical
+    description: "MANDATORY for authentication, APIs, data handling, or security features"
+    
+  test_automation:
+    agent: test-automator
+    trigger: "on_new_functionality"
+    priority: high
+    description: "MANDATORY for new features, components, or modules"
+
+# ===========================================
+# File Extension Triggers
+# ===========================================
+
+file_triggers:
+  # C# Backend Files
+  "*.cs":
+    primary: [csharp-expert, backend-architect]
+    secondary: [rest-expert, api-documenter]
+    mandatory_followup: [code-reviewer, security-auditor]
+    
+  # Frontend React/Next.js Files  
+  "*.tsx":
+    primary: [frontend-developer, nextjs-expert]
+    secondary: [tailwind-expert, ui-ux-designer]
+    mandatory_followup: [code-reviewer, test-automator]
+    
+  "*.jsx":
+    primary: [frontend-developer, nextjs-expert]
+    secondary: [tailwind-expert, ui-ux-designer]
+    mandatory_followup: [code-reviewer, test-automator]
+    
+  # TypeScript Files
+  "*.ts":
+    primary: [typescript-pro, frontend-developer]
+    secondary: [nextjs-expert]
+    mandatory_followup: [code-reviewer, test-automator]
+    
+  # Database Files
+  "*.sql":
+    primary: [sql-pro, data-engineer]
+    secondary: [database-optimizer, database-admin]
+    mandatory_followup: [code-reviewer, performance-engineer]
+    
+  # Container Files
+  "Dockerfile*":
+    primary: [docker-expert]
+    secondary: [deployment-engineer, devops-troubleshooter]
+    mandatory_followup: [security-auditor, performance-engineer]
+    
+  # Kubernetes Files
+  "*.yml":
+    conditions:
+      - path_contains: ["k8s/", "kubernetes/", ".kube/"]
+        agents:
+          primary: [kubernetes-expert]
+          secondary: [docker-expert, deployment-engineer]
+          mandatory_followup: [security-auditor, devops-troubleshooter]
+      - path_contains: [".github/workflows/"]
+        agents:
+          primary: [github-actions-expert]
+          secondary: [deployment-engineer, docker-expert]
+          mandatory_followup: [security-auditor, test-automator]
+    default:
+      primary: [devops-troubleshooter]
+      
+  "*.yaml":
+    conditions:
+      - path_contains: ["k8s/", "kubernetes/", ".kube/"]
+        agents:
+          primary: [kubernetes-expert]
+          secondary: [docker-expert, deployment-engineer]
+          mandatory_followup: [security-auditor, devops-troubleshooter]
+      - path_contains: [".github/workflows/"]
+        agents:
+          primary: [github-actions-expert]
+          secondary: [deployment-engineer, docker-expert]
+          mandatory_followup: [security-auditor, test-automator]
+    default:
+      primary: [devops-troubleshooter]
+  
+  # Styling Files
+  "*.css":
+    primary: [css-expert, tailwind-expert]
+    secondary: [frontend-developer, ui-ux-designer]
+    mandatory_followup: [code-reviewer]
+    
+  "*.scss":
+    primary: [css-expert]
+    secondary: [frontend-developer, ui-ux-designer]
+    mandatory_followup: [code-reviewer]
+    
+  # Test Files
+  "*.test.*":
+    primary: [test-automator]
+    secondary: [debugger, csharp-expert, frontend-developer]
+    mandatory_followup: [code-reviewer]
+    
+  "*.spec.*":
+    primary: [test-automator]
+    secondary: [debugger, csharp-expert, frontend-developer]
+    mandatory_followup: [code-reviewer]
+    
+  # Documentation Files
+  "*.md":
+    conditions:
+      - filename_matches: ["README.md", "API.md", "DOCUMENTATION.md"]
+        agents:
+          primary: [api-documenter]
+          secondary: [ui-ux-designer]
+    default:
+      primary: [api-documenter]
+      
+  # Configuration Files
+  "package.json":
+    primary: [frontend-developer, nextjs-expert]
+    secondary: [deployment-engineer]
+    mandatory_followup: [security-auditor]
+    
+  "*.csproj":
+    primary: [csharp-expert, backend-architect]
+    secondary: [deployment-engineer]
+    mandatory_followup: [security-auditor]
+    
+  "docker-compose*.yml":
+    primary: [docker-expert]
+    secondary: [devops-troubleshooter, deployment-engineer]
+    mandatory_followup: [security-auditor, performance-engineer]
+
+# ===========================================
+# Keyword Triggers
+# ===========================================
+
+keyword_triggers:
+  # Performance Related
+  performance_keywords:
+    keywords: ["performance", "slow", "optimization", "bottleneck", "latency", "speed", "memory"]
+    primary: [performance-engineer]
+    secondary: [database-optimizer, csharp-expert]
+    mandatory_followup: [test-automator, debugger]
+    
+  # Security Related  
+  security_keywords:
+    keywords: ["security", "vulnerability", "authentication", "authorization", "JWT", "OAuth", "encryption", "password", "token"]
+    primary: [security-auditor]
+    secondary: [backend-architect, database-admin]
+    mandatory_followup: [test-automator, code-reviewer]
+    
+  # Database Related
+  database_keywords:
+    keywords: ["database", "migration", "schema", "SQL", "PostgreSQL", "query", "index", "table"]
+    primary: [data-engineer, sql-pro]
+    secondary: [database-optimizer, database-admin, legacy-modernizer]
+    mandatory_followup: [code-reviewer, performance-engineer]
+    
+  # Container Related
+  container_keywords:
+    keywords: ["container", "docker", "kubernetes", "k8s", "pod", "deployment", "service", "ingress"]
+    primary: [docker-expert, kubernetes-expert]
+    secondary: [deployment-engineer, devops-troubleshooter]
+    mandatory_followup: [security-auditor, performance-engineer]
+    
+  # Frontend Related
+  frontend_keywords:
+    keywords: ["frontend", "UI", "component", "styling", "React", "Next.js", "Tailwind", "responsive"]
+    primary: [frontend-developer, ui-ux-designer]
+    secondary: [nextjs-expert, tailwind-expert, css-expert]
+    mandatory_followup: [code-reviewer, test-automator]
+    
+  # Backend Related
+  backend_keywords:
+    keywords: ["API", "endpoint", "REST", "backend", "service", "controller", "middleware", ".NET"]
+    primary: [backend-architect, csharp-expert]
+    secondary: [rest-expert, api-documenter]
+    mandatory_followup: [code-reviewer, security-auditor, test-automator]
+    
+  # Error/Debug Related
+  error_keywords:
+    keywords: ["error", "bug", "failing", "broken", "exception", "crash", "issue", "problem", "debug"]
+    primary: [debugger, error-detective]
+    secondary: [devops-troubleshooter, csharp-expert]
+    mandatory_followup: [test-automator, code-reviewer]
+    
+  # Legacy/Migration Related
+  legacy_keywords:
+    keywords: ["legacy", "migration", "modernization", "strangler fig", "anti-corruption", "VB.NET"]
+    primary: [legacy-modernizer]
+    secondary: [architect-reviewer, csharp-expert, data-engineer]
+    mandatory_followup: [security-auditor, test-automator]
+    
+  # Testing Related
+  testing_keywords:
+    keywords: ["test", "testing", "coverage", "unit test", "integration test", "TDD", "BDD"]
+    primary: [test-automator]
+    secondary: [debugger, csharp-expert, frontend-developer]
+    mandatory_followup: [code-reviewer]
+    
+  # Deployment Related
+  deployment_keywords:
+    keywords: ["deployment", "CI/CD", "pipeline", "GitHub Actions", "release", "staging", "production"]
+    primary: [deployment-engineer, github-actions-expert]
+    secondary: [docker-expert, kubernetes-expert, devops-troubleshooter]
+    mandatory_followup: [security-auditor, test-automator]
+
+# ===========================================
+# Task Category Mapping
+# ===========================================
+
+task_categories:
+  api_development:
+    description: "Creating or modifying REST APIs, controllers, endpoints"
+    primary: [backend-architect, rest-expert]
+    secondary: [csharp-expert, api-documenter]
+    mandatory_followup: [code-reviewer, security-auditor, test-automator]
+    
+  frontend_development:
+    description: "React components, Next.js pages, UI implementation"
+    primary: [frontend-developer, nextjs-expert]
+    secondary: [tailwind-expert, ui-ux-designer, css-expert]
+    mandatory_followup: [code-reviewer, test-automator]
+    
+  database_operations:
+    description: "Schema changes, migrations, query optimization"
+    primary: [data-engineer, sql-pro]
+    secondary: [database-optimizer, database-admin, legacy-modernizer]
+    mandatory_followup: [code-reviewer, performance-engineer, test-automator]
+    
+  container_infrastructure:
+    description: "Docker, Kubernetes, deployment configurations"
+    primary: [docker-expert, kubernetes-expert]
+    secondary: [deployment-engineer, devops-troubleshooter]
+    mandatory_followup: [security-auditor, performance-engineer]
+    
+  legacy_migration:
+    description: "Legacy system integration, modernization tasks"
+    primary: [legacy-modernizer]
+    secondary: [architect-reviewer, csharp-expert, data-engineer]
+    mandatory_followup: [security-auditor, test-automator, code-reviewer]
+    
+  performance_optimization:
+    description: "Performance issues, bottleneck analysis, optimization"
+    primary: [performance-engineer]
+    secondary: [database-optimizer, csharp-expert, frontend-developer]
+    mandatory_followup: [test-automator, debugger]
+    
+  security_implementation:
+    description: "Authentication, authorization, security features"
+    primary: [security-auditor]
+    secondary: [backend-architect, csharp-expert, database-admin]
+    mandatory_followup: [test-automator, code-reviewer]
+    
+  testing_automation:
+    description: "Test creation, test automation, coverage improvement"
+    primary: [test-automator]
+    secondary: [debugger, csharp-expert, frontend-developer]
+    mandatory_followup: [code-reviewer]
+
+# ===========================================
+# Emergency Response Chains
+# ===========================================
+
+emergency_chains:
+  production_outage:
+    description: "Production system outage or critical failure"
+    sequence:
+      - agent: devops-troubleshooter
+        priority: immediate
+        timeout: 5_minutes
+      - agent: error-detective
+        priority: immediate
+        timeout: 10_minutes
+      - agent: debugger
+        priority: high
+        timeout: 15_minutes
+      - agent: security-auditor
+        priority: high
+        timeout: 20_minutes
+      - agent: test-automator
+        priority: medium
+        timeout: 30_minutes
+        
+  security_breach:
+    description: "Security vulnerability or potential breach"
+    sequence:
+      - agent: security-auditor
+        priority: immediate
+        timeout: 5_minutes
+      - agent: devops-troubleshooter
+        priority: immediate
+        timeout: 10_minutes
+      - agent: error-detective
+        priority: high
+        timeout: 15_minutes
+      - agent: database-admin
+        priority: high
+        timeout: 20_minutes
+      - agent: test-automator
+        priority: medium
+        timeout: 30_minutes
+        
+  database_corruption:
+    description: "Database corruption or data integrity issues"
+    sequence:
+      - agent: database-admin
+        priority: immediate
+        timeout: 5_minutes
+      - agent: data-engineer
+        priority: immediate
+        timeout: 10_minutes
+      - agent: sql-pro
+        priority: high
+        timeout: 15_minutes
+      - agent: debugger
+        priority: high
+        timeout: 20_minutes
+      - agent: test-automator
+        priority: medium
+        timeout: 30_minutes
+
+# ===========================================
+# Quality Gates Configuration
+# ===========================================
+
+quality_gates:
+  mandatory_reviews:
+    - agent: code-reviewer
+      condition: "always"
+      description: "Every code change must be reviewed"
+      
+    - agent: security-auditor
+      condition: "security_relevant"
+      description: "All security-relevant code must be audited"
+      
+    - agent: test-automator
+      condition: "new_functionality"
+      description: "New features must have tests"
+      
+    - agent: architect-reviewer
+      condition: "structural_changes"
+      description: "Architectural changes must be reviewed"
+      
+  performance_gates:
+    - agent: performance-engineer
+      condition: "critical_path_changes"
+      description: "Critical performance paths must be analyzed"
+      
+    - agent: database-optimizer
+      condition: "database_changes"
+      description: "Database changes must be optimized"
+
+# ===========================================
+# Context-Aware Rules
+# ===========================================
+
+context_rules:
+  file_size_thresholds:
+    small_file: 100_lines
+    medium_file: 500_lines
+    large_file: 1000_lines
+    
+  complexity_triggers:
+    high_complexity:
+      conditions: ["cyclomatic_complexity > 15", "file_size > 500_lines"]
+      additional_agents: [architect-reviewer, code-reviewer]
+      
+  project_phase_rules:
+    development:
+      relaxed_rules: true
+      focus_agents: [debugger, test-automator]
+      
+    staging:
+      strict_rules: true
+      focus_agents: [security-auditor, performance-engineer, test-automator]
+      
+    production:
+      maximum_strictness: true
+      focus_agents: [security-auditor, performance-engineer, devops-troubleshooter]
+
+# ===========================================
+# Success Metrics
+# ===========================================
+
+success_metrics:
+  target_coverage:
+    code_review: 100%
+    security_audit: 100%  # for security-relevant code
+    test_coverage: 80%
+    architecture_review: 100%  # for structural changes
+    
+  response_times:
+    critical_agents: 30_seconds
+    high_priority_agents: 60_seconds
+    standard_agents: 120_seconds
+    
+  quality_improvements:
+    bug_reduction: 70%
+    security_vulnerabilities: 90%
+    performance_improvements: 50%
+    code_maintainability: 60%

@@ -487,3 +487,245 @@ automation:
 ```
 
 This Git Flow system provides a comprehensive, automated workflow that scales from individual development to team collaboration while maintaining flexibility and robustness.
+
+---
+
+# 🤖 Sub-Agent Automation System
+
+## Proactive Sub-Agent Usage
+
+Claude Code MUST automatically use specialized sub-agents when tasks match their expertise. This ensures optimal results and consistency across the project.
+
+### 🔄 Automatic Agent Selection Rules
+
+#### **ALWAYS Use These Agents Proactively:**
+
+##### 1. **@code-reviewer** - MANDATORY after code writing
+```
+WHEN: Any significant code has been written or modified
+ACTION: Immediately invoke code-reviewer for quality, security, and maintainability review
+PRIORITY: Critical - NEVER skip this step
+```
+
+##### 2. **@architect-reviewer** - MANDATORY after architectural changes
+```
+WHEN: New services, APIs, architecture patterns, or structural changes
+ACTION: Invoke architect-reviewer to ensure SOLID principles and proper layering
+PRIORITY: Critical - Required for architectural consistency
+```
+
+##### 3. **@debugger** - MANDATORY when encountering issues
+```
+WHEN: Errors, test failures, unexpected behavior, or troubleshooting needed
+ACTION: Immediately invoke debugger for systematic problem resolution
+PRIORITY: Critical - Use proactively, don't wait for issues to escalate
+```
+
+##### 4. **@test-automator** - MANDATORY for test coverage
+```
+WHEN: New features, components, or modules are implemented
+ACTION: Invoke test-automator for comprehensive test suite creation
+PRIORITY: High - Essential for quality assurance
+```
+
+##### 5. **@security-auditor** - MANDATORY for security reviews
+```
+WHEN: Authentication, authorization, data handling, or API endpoints
+ACTION: Invoke security-auditor for vulnerability assessment
+PRIORITY: Critical - Required for production readiness
+```
+
+### 🎯 Task-Specific Agent Mapping
+
+#### **Frontend Development:**
+```yaml
+Tasks: React components, Next.js pages, UI/UX implementation, styling
+Primary: @frontend-developer
+Secondary: @nextjs-expert, @tailwind-expert, @ui-ux-designer
+Always Follow With: @code-reviewer, @test-automator
+```
+
+#### **Backend Development:**
+```yaml
+Tasks: .NET APIs, controllers, services, business logic
+Primary: @backend-architect, @csharp-expert
+Secondary: @rest-expert, @api-documenter
+Always Follow With: @code-reviewer, @security-auditor, @test-automator
+```
+
+#### **Database Operations:**
+```yaml
+Tasks: Schema changes, migrations, query optimization
+Primary: @data-engineer, @sql-pro
+Secondary: @database-optimizer, @database-admin
+Always Follow With: @code-reviewer, @performance-engineer
+```
+
+#### **Container & Infrastructure:**
+```yaml
+Tasks: Docker, Kubernetes, deployment configurations
+Primary: @docker-expert, @kubernetes-expert
+Secondary: @deployment-engineer, @devops-troubleshooter
+Always Follow With: @security-auditor, @performance-engineer
+```
+
+#### **Legacy Migration:**
+```yaml
+Tasks: Legacy system integration, modernization, migration
+Primary: @legacy-modernizer
+Secondary: @architect-reviewer, @csharp-expert
+Always Follow With: @security-auditor, @test-automator
+```
+
+#### **Performance & Optimization:**
+```yaml
+Tasks: Performance issues, optimization, bottleneck analysis
+Primary: @performance-engineer
+Secondary: @database-optimizer, @csharp-expert
+Always Follow With: @test-automator, @debugger
+```
+
+### 🚨 Critical Automation Triggers
+
+#### **Production Issues (Emergency Response):**
+```
+Trigger: Production errors, system outages, critical bugs
+Sequence:
+1. @devops-troubleshooter (immediate response)
+2. @error-detective (root cause analysis)
+3. @debugger (systematic debugging)
+4. @security-auditor (security impact assessment)
+5. @test-automator (regression testing)
+```
+
+#### **New Feature Implementation:**
+```
+Trigger: Feature development request
+Sequence:
+1. @backend-architect OR @frontend-developer (based on scope)
+2. @ui-ux-designer (if UI changes)
+3. @security-auditor (security review)
+4. @test-automator (test coverage)
+5. @code-reviewer (final review)
+6. @architect-reviewer (architectural consistency)
+```
+
+#### **Database Schema Changes:**
+```
+Trigger: Database modifications, migrations
+Sequence:
+1. @data-engineer (schema design)
+2. @sql-pro (query optimization)
+3. @database-admin (deployment strategy)
+4. @performance-engineer (performance impact)
+5. @test-automator (migration testing)
+```
+
+### 📋 Agent Selection Matrix
+
+| Task Category | Primary Agent | Secondary Agents | Mandatory Follow-up |
+|---------------|---------------|------------------|-------------------|
+| **API Development** | @backend-architect | @rest-expert, @csharp-expert | @code-reviewer, @security-auditor |
+| **Frontend Components** | @frontend-developer | @nextjs-expert, @tailwind-expert | @code-reviewer, @test-automator |
+| **Database Migration** | @data-engineer | @sql-pro, @legacy-modernizer | @code-reviewer, @performance-engineer |
+| **Container Setup** | @docker-expert | @kubernetes-expert, @deployment-engineer | @security-auditor, @devops-troubleshooter |
+| **Performance Issues** | @performance-engineer | @database-optimizer, @csharp-expert | @test-automator, @debugger |
+| **Security Reviews** | @security-auditor | @backend-architect, @database-admin | @test-automator, @code-reviewer |
+| **Legacy Integration** | @legacy-modernizer | @architect-reviewer, @csharp-expert | @security-auditor, @test-automator |
+| **CI/CD Pipeline** | @github-actions-expert | @deployment-engineer, @docker-expert | @security-auditor, @test-automator |
+| **Error Investigation** | @debugger | @error-detective, @devops-troubleshooter | @test-automator, @code-reviewer |
+| **Architecture Review** | @architect-reviewer | @backend-architect, @performance-engineer | @security-auditor, @code-reviewer |
+
+### 🎯 Context-Aware Agent Selection
+
+#### **File-Based Triggers:**
+```yaml
+# Automatically invoke based on file types being worked on:
+
+"*.cs": [@csharp-expert, @backend-architect]
+"*.tsx, *.jsx": [@frontend-developer, @nextjs-expert]
+"*.sql": [@sql-pro, @data-engineer]
+"Dockerfile*": [@docker-expert]
+"*.yml, *.yaml" (k8s): [@kubernetes-expert]
+"*.md" (docs): [@api-documenter]
+"*.css, *.scss": [@css-expert, @tailwind-expert]
+"*.test.*, *.spec.*": [@test-automator]
+".github/workflows/*": [@github-actions-expert]
+```
+
+#### **Keyword Triggers:**
+```yaml
+# Automatically invoke when these keywords appear in user requests:
+
+"performance", "slow", "optimization": [@performance-engineer]
+"security", "vulnerability", "authentication": [@security-auditor]
+"error", "bug", "failing", "broken": [@debugger, @error-detective]
+"database", "migration", "schema": [@data-engineer, @sql-pro]
+"container", "docker", "kubernetes": [@docker-expert, @kubernetes-expert]
+"frontend", "UI", "component", "styling": [@frontend-developer, @ui-ux-designer]
+"API", "endpoint", "REST", "backend": [@backend-architect, @rest-expert]
+"legacy", "migration", "modernization": [@legacy-modernizer]
+"test", "testing", "coverage": [@test-automator]
+"deployment", "CI/CD", "pipeline": [@deployment-engineer, @github-actions-expert]
+```
+
+### ⚡ Immediate Action Rules
+
+#### **NEVER Skip These Agents:**
+1. **@code-reviewer** - After ANY code writing/modification
+2. **@security-auditor** - For ANY authentication, API, or data handling code
+3. **@test-automator** - For ANY new functionality
+4. **@debugger** - When ANY errors or unexpected behavior occurs
+5. **@architect-reviewer** - After ANY architectural changes
+
+#### **Chain Reactions:**
+```
+Database Change → @data-engineer → @sql-pro → @performance-engineer → @test-automator
+API Creation → @backend-architect → @rest-expert → @security-auditor → @code-reviewer
+UI Component → @frontend-developer → @tailwind-expert → @test-automator → @code-reviewer
+Container Build → @docker-expert → @security-auditor → @performance-engineer
+```
+
+### 🔍 Quality Gates
+
+Each sub-agent must complete their review before proceeding:
+
+```yaml
+Quality_Gates:
+  Code_Quality: [@code-reviewer] # MANDATORY
+  Security: [@security-auditor] # MANDATORY for production code
+  Performance: [@performance-engineer] # For critical paths
+  Architecture: [@architect-reviewer] # For structural changes
+  Testing: [@test-automator] # For new features
+```
+
+### 📊 Agent Performance Tracking
+
+Monitor and ensure agents are being used appropriately:
+
+```yaml
+Metrics:
+  - Agent_Usage_Rate: Track frequency of proactive agent usage
+  - Quality_Improvement: Measure code quality before/after agent reviews
+  - Issue_Prevention: Count issues caught by proactive agent usage
+  - Response_Time: Track how quickly agents respond to triggers
+```
+
+### 🎯 Success Criteria
+
+The sub-agent system is working effectively when:
+- ✅ **100% Code Review Coverage**: Every code change reviewed by @code-reviewer
+- ✅ **Proactive Security**: @security-auditor invoked for all security-relevant code
+- ✅ **Comprehensive Testing**: @test-automator ensures >80% test coverage
+- ✅ **Zero Architecture Drift**: @architect-reviewer maintains consistency
+- ✅ **Rapid Issue Resolution**: @debugger responds to all errors immediately
+
+## 💡 Best Practices for Sub-Agent Usage
+
+1. **Always Use Multiple Agents**: Complex tasks benefit from multiple perspectives
+2. **Follow Agent Chains**: Some agents work better in sequence
+3. **Don't Skip Reviews**: Quality gates are mandatory, not optional
+4. **Use Context**: File types and keywords should trigger appropriate agents
+5. **Learn from Agents**: Incorporate their recommendations into future work
+
+This automated sub-agent system ensures consistent, high-quality outcomes across all aspects of the KGV migration project.
