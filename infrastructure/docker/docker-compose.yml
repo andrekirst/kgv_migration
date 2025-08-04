@@ -1,9 +1,9 @@
 version: '3.9'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database with PostGIS
   postgres:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.3-alpine
     container_name: kgv-postgres
     restart: unless-stopped
     environment:
@@ -11,9 +11,16 @@ services:
       POSTGRES_USER: kgv_admin
       POSTGRES_PASSWORD: ${DB_PASSWORD:-DevPassword123!}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.utf8"
+      # Performance settings
+      POSTGRES_SHARED_BUFFERS: "256MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
+      POSTGRES_WORK_MEM: "16MB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "256MB"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+      - postgres_backups:/var/lib/postgresql/backups
+      - ../../postgresql:/docker-entrypoint-initdb.d:ro
+      - ../../etl:/docker-entrypoint-initdb.d/etl:ro
     ports:
       - "5432:5432"
     healthcheck:
@@ -260,6 +267,67 @@ services:
     profiles:
       - monitoring
 
+  # PostgreSQL Exporter for monitoring
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: kgv-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://kgv_admin:${DB_PASSWORD:-DevPassword123!}@postgres:5432/kgv_development?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yaml"
+      PG_EXPORTER_CONSTANT_LABELS: "environment=development,service=kgv"
+    volumes:
+      - ../../monitoring/postgres_exporter_queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kgv-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - monitoring
+
+  # Migration Pipeline Service
+  migration-pipeline:
+    build:
+      context: ../../etl/python
+      dockerfile: Dockerfile
+    container_name: kgv-migration-pipeline
+    restart: "no"  # Run on-demand only
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: kgv_development
+      POSTGRES_USER: kgv_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-DevPassword123!}
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-RedisDevPass123!}
+      MIGRATION_BATCH_SIZE: 1000
+      MIGRATION_MAX_WORKERS: 4
+      ENABLE_METRICS: "true"
+      METRICS_PORT: 8000
+    volumes:
+      - migration_logs:/app/logs
+      - migration_data:/app/data
+    ports:
+      - "8000:8000"  # Metrics endpoint
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kgv-network
+    profiles:
+      - migration
+
 networks:
   kgv-network:
     driver: bridge
@@ -268,6 +336,8 @@ networks:
 volumes:
   postgres_data:
     name: kgv-postgres-data
+  postgres_backups:
+    name: kgv-postgres-backups
   redis_data:
     name: kgv-redis-data
   api_logs:
@@ -280,3 +350,7 @@ volumes:
     name: kgv-prometheus-data
   grafana_data:
     name: kgv-grafana-data
+  migration_logs:
+    name: kgv-migration-logs
+  migration_data:
+    name: kgv-migration-data

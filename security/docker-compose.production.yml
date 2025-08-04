@@ -1,0 +1,581 @@
+version: '3.9'
+
+# Production-grade secure Docker Compose configuration
+# Implements all 8 critical security fixes
+
+services:
+  # PostgreSQL Database with encryption and security hardening
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: kgv-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: kgv_production
+      POSTGRES_USER: kgv_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.utf8 --data-checksums"
+      # Enable SSL/TLS
+      POSTGRES_SSL_MODE: require
+      POSTGRES_SSL_CERT: /var/lib/postgresql/certs/server.crt
+      POSTGRES_SSL_KEY: /var/lib/postgresql/certs/server.key
+      POSTGRES_SSL_CA: /var/lib/postgresql/certs/ca.crt
+      # Performance and security settings
+      POSTGRES_SHARED_BUFFERS: "512MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "2GB"
+      POSTGRES_MAX_CONNECTIONS: "100"
+      POSTGRES_WORK_MEM: "32MB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "512MB"
+      POSTGRES_CHECKPOINT_SEGMENTS: "32"
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: "0.9"
+      POSTGRES_WAL_BUFFERS: "16MB"
+      POSTGRES_DEFAULT_STATISTICS_TARGET: "100"
+      POSTGRES_RANDOM_PAGE_COST: "1.1"
+      POSTGRES_EFFECTIVE_IO_CONCURRENCY: "200"
+      POSTGRES_MIN_WAL_SIZE: "1GB"
+      POSTGRES_MAX_WAL_SIZE: "4GB"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:rw
+      - postgres_backups:/var/lib/postgresql/backups:rw
+      - ./certs/postgres:/var/lib/postgresql/certs:ro
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+      - ./security/pg_hba_secure.conf:/var/lib/postgresql/data/pg_hba.conf:rw
+      - ./security/postgresql-security.conf:/etc/postgresql/postgresql.conf:ro
+    secrets:
+      - db_password
+    # Remove external port exposure - only accessible within network
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kgv_admin -d kgv_production"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - database_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # Redis Cache with authentication and SSL
+  redis:
+    image: redis:7-alpine
+    container_name: kgv-redis
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-backlog 511
+      --tcp-keepalive 300
+      --timeout 0
+      --databases 16
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --rdbcompression yes
+      --rdbchecksum yes
+      --stop-writes-on-bgsave-error yes
+      --port 0
+      --tls-port 6379
+      --tls-cert-file /tls/redis.crt
+      --tls-key-file /tls/redis.key
+      --tls-ca-cert-file /tls/ca.crt
+      --tls-dh-params-file /tls/redis.dh
+      --tls-auth-clients yes
+      --tls-protocols "TLSv1.2 TLSv1.3"
+      --tls-ciphers "HIGH:!aNULL:!MD5"
+      --tls-ciphersuites "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256"
+      --tls-prefer-server-ciphers yes
+    volumes:
+      - redis_data:/data:rw
+      - ./certs/redis:/tls:ro
+    secrets:
+      - redis_password
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--tls", "--cert", "/tls/redis.crt", "--key", "/tls/redis.key", "--cacert", "/tls/ca.crt", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - cache_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+
+  # .NET API with security hardening
+  api:
+    build:
+      context: ../src/KGV.Api
+      dockerfile: Dockerfile.production
+      target: production
+      args:
+        - BUILD_VERSION=${BUILD_VERSION:-1.0.0}
+    container_name: kgv-api
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: https://+:5001;http://+:5000
+      ASPNETCORE_HTTPS_PORT: 5001
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /certs/api/api.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password_FILE: /run/secrets/api_cert_password
+      # Database connection with SSL
+      ConnectionStrings__Database: "Host=postgres;Database=kgv_production;Username=kgv_admin;Password=${DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=false;Include Error Detail=false"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},ssl=true,sslHost=redis,abortConnect=false"
+      # JWT Configuration
+      JWT__Issuer: "kgv-api-prod"
+      JWT__Audience: "kgv-web-prod"
+      JWT__Algorithm: "RS256"
+      JWT__PublicKeyPath: "/certs/jwt/public.pem"
+      JWT__PrivateKeyPath: "/certs/jwt/private.pem"
+      JWT__AccessTokenExpiry: "900"  # 15 minutes
+      JWT__RefreshTokenExpiry: "86400"  # 24 hours
+      # Security Settings
+      Security__EnableRateLimiting: "true"
+      Security__RateLimitWindow: "900000"  # 15 minutes
+      Security__RateLimitMaxRequests: "100"
+      Security__EnableCors: "true"
+      Security__AllowedOrigins: "${ALLOWED_ORIGINS}"
+      Security__RequireHttps: "true"
+      Security__EnableHsts: "true"
+      Security__HstsMaxAge: "31536000"
+      Security__EnableXssProtection: "true"
+      Security__EnableContentTypeNoSniff: "true"
+      Security__EnableFrameOptions: "true"
+      Security__FrameOptionsPolicy: "DENY"
+      Security__EnableCsp: "true"
+      Security__CspPolicy: "${CSP_POLICY}"
+      # Logging
+      Logging__LogLevel__Default: "Warning"
+      Logging__LogLevel__Microsoft: "Warning"
+      Logging__LogLevel__Microsoft.Hosting.Lifetime: "Information"
+      Serilog__MinimumLevel: "Warning"
+      Serilog__WriteTo__0__Name: "File"
+      Serilog__WriteTo__0__Args__path: "/app/logs/api-.log"
+      Serilog__WriteTo__0__Args__rollingInterval: "Day"
+      Serilog__WriteTo__0__Args__retainedFileCountLimit: "30"
+      # Data Protection
+      DataProtection__ApplicationName: "KGV"
+      DataProtection__KeyRingPath: "/app/keys"
+    volumes:
+      - api_logs:/app/logs:rw
+      - api_keys:/app/keys:rw
+      - ./certs/api:/certs/api:ro
+      - ./certs/jwt:/certs/jwt:ro
+    secrets:
+      - db_password
+      - redis_password
+      - jwt_private_key
+      - api_cert_password
+    expose:
+      - "5000"
+      - "5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - api_network
+      - database_network
+      - cache_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/temp
+
+  # Next.js Web Application with security
+  web:
+    build:
+      context: ../src/KGV.Web
+      dockerfile: Dockerfile.production
+      target: production
+      args:
+        - BUILD_VERSION=${BUILD_VERSION:-1.0.0}
+    container_name: kgv-web
+    restart: always
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://api:5001
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET_FILE: /run/secrets/nextauth_secret
+      NEXTAUTH_URL_INTERNAL: https://api:5001
+      # Security headers
+      NEXT_PUBLIC_CSP_POLICY: "${CSP_POLICY}"
+      NEXT_PUBLIC_ENABLE_HSTS: "true"
+      NEXT_PUBLIC_HSTS_MAX_AGE: "31536000"
+    volumes:
+      - web_cache:/app/.next/cache:rw
+    secrets:
+      - nextauth_secret
+      - api_client_cert
+    expose:
+      - "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - web_network
+      - api_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/server
+
+  # Nginx Reverse Proxy with SSL termination
+  nginx:
+    image: nginx:alpine
+    container_name: kgv-nginx
+    restart: always
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+      - ./certs/nginx:/etc/nginx/certs:ro
+      - nginx_cache:/var/cache/nginx:rw
+      - nginx_logs:/var/log/nginx:rw
+    ports:
+      - "443:443"
+      - "80:80"
+    depends_on:
+      - web
+      - api
+    networks:
+      - web_network
+      - monitoring_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+
+  # Migration Pipeline Service with security
+  migration-pipeline:
+    build:
+      context: ../etl/python
+      dockerfile: Dockerfile.production
+    container_name: kgv-migration-pipeline
+    restart: "no"
+    environment:
+      # PostgreSQL connection with SSL
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: kgv_production
+      POSTGRES_USER: kgv_migration
+      POSTGRES_PASSWORD_FILE: /run/secrets/migration_db_password
+      POSTGRES_PORT: 5432
+      POSTGRES_SSL_MODE: require
+      POSTGRES_SSL_CERT: /certs/postgres/client.crt
+      POSTGRES_SSL_KEY: /certs/postgres/client.key
+      POSTGRES_SSL_ROOT_CERT: /certs/postgres/ca.crt
+      # Redis connection with SSL
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      REDIS_SSL: "true"
+      REDIS_SSL_CERT: /certs/redis/client.crt
+      REDIS_SSL_KEY: /certs/redis/client.key
+      REDIS_SSL_CA: /certs/redis/ca.crt
+      # Migration settings
+      MIGRATION_BATCH_SIZE: 1000
+      MIGRATION_MAX_WORKERS: 4
+      ENABLE_METRICS: "true"
+      METRICS_PORT: 8000
+      # Security settings
+      ENABLE_AUDIT_LOG: "true"
+      ENABLE_DATA_VALIDATION: "true"
+      ENABLE_ENCRYPTION_AT_REST: "true"
+      DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
+    volumes:
+      - migration_logs:/app/logs:rw
+      - migration_data:/app/data:rw
+      - ./certs/postgres:/certs/postgres:ro
+      - ./certs/redis:/certs/redis:ro
+    secrets:
+      - migration_db_password
+      - redis_password
+      - data_encryption_key
+    networks:
+      - database_network
+      - cache_network
+      - monitoring_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/temp
+    profiles:
+      - migration
+
+  # Monitoring services (only accessible internally)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kgv-prometheus
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-admin-api=false'
+      - '--web.enable-lifecycle=false'
+      - '--web.external-url=https://monitoring.your-domain.com/prometheus'
+      - '--web.route-prefix=/prometheus'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus:rw
+    expose:
+      - "9090"
+    networks:
+      - monitoring_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kgv-grafana
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_password
+      GF_SECURITY_SECRET_KEY_FILE: /run/secrets/grafana_secret_key
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: "strict"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY: "true"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE_SECONDS: "31536000"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY_PRELOAD: "true"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY_SUBDOMAINS: "true"
+      GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "true"
+      GF_SECURITY_X_XSS_PROTECTION: "true"
+      GF_SERVER_ROOT_URL: "https://monitoring.your-domain.com/grafana"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana:rw
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    secrets:
+      - grafana_password
+      - grafana_secret_key
+    expose:
+      - "3000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    read_only: true
+    tmpfs:
+      - /tmp
+
+# Network Configuration with proper segmentation
+networks:
+  database_network:
+    driver: bridge
+    name: kgv-database-network
+    internal: true  # No external access
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+  
+  cache_network:
+    driver: bridge
+    name: kgv-cache-network
+    internal: true  # No external access
+    ipam:
+      config:
+        - subnet: 172.28.1.0/24
+  
+  api_network:
+    driver: bridge
+    name: kgv-api-network
+    internal: true  # No external access
+    ipam:
+      config:
+        - subnet: 172.28.2.0/24
+  
+  web_network:
+    driver: bridge
+    name: kgv-web-network
+    ipam:
+      config:
+        - subnet: 172.28.3.0/24
+  
+  monitoring_network:
+    driver: bridge
+    name: kgv-monitoring-network
+    internal: true  # No external access
+    ipam:
+      config:
+        - subnet: 172.28.4.0/24
+
+# Volumes with encryption at rest (requires Docker EE or appropriate volume driver)
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,encrypt
+      device: /var/lib/kgv/postgres/data
+  
+  postgres_backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,encrypt
+      device: /var/lib/kgv/postgres/backups
+  
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,encrypt
+      device: /var/lib/kgv/redis/data
+  
+  api_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/kgv/api
+  
+  api_keys:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,encrypt
+      device: /var/lib/kgv/api/keys
+  
+  web_cache:
+    driver: local
+  
+  nginx_cache:
+    driver: local
+  
+  nginx_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/kgv/nginx
+  
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,encrypt
+      device: /var/lib/kgv/prometheus
+  
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,encrypt
+      device: /var/lib/kgv/grafana
+  
+  migration_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/kgv/migration
+  
+  migration_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,encrypt
+      device: /var/lib/kgv/migration
+
+# Docker Secrets for sensitive data
+secrets:
+  db_password:
+    external: true
+  
+  redis_password:
+    external: true
+  
+  jwt_private_key:
+    external: true
+  
+  api_cert_password:
+    external: true
+  
+  nextauth_secret:
+    external: true
+  
+  api_client_cert:
+    external: true
+  
+  migration_db_password:
+    external: true
+  
+  data_encryption_key:
+    external: true
+  
+  grafana_password:
+    external: true
+  
+  grafana_secret_key:
+    external: true

@@ -1,0 +1,65 @@
+# =============================================================================
+# PostgreSQL Exporter Configuration for KGV Migration Monitoring
+# =============================================================================
+
+version: '3.9'
+
+services:
+  # PostgreSQL Exporter for Prometheus metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: kgv-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://kgv_admin:${DB_PASSWORD:-DevPassword123!}@postgres:5432/kgv_development?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yaml"
+      PG_EXPORTER_CONSTANT_LABELS: "environment=development,service=kgv"
+    volumes:
+      - ./postgres_exporter_queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+    networks:
+      - kgv-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Migration Pipeline Metrics Exporter
+  migration-metrics:
+    build:
+      context: ../etl/python
+      dockerfile: Dockerfile.metrics
+    container_name: kgv-migration-metrics
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: kgv_development
+      POSTGRES_USER: kgv_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-DevPassword123!}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-RedisDevPass123!}
+      METRICS_PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - kgv-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  kgv-network:
+    external: true
+
+volumes:
+  prometheus_data:
+    external: true

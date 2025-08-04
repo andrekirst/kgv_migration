@@ -1,0 +1,442 @@
+# Secure Docker Compose Configuration for KGV Migration
+# GDPR-Compliant PostgreSQL Infrastructure
+# Version: 1.0
+# Last Updated: 2025-08-04
+
+version: '3.9'
+
+services:
+  # =============================================================================
+  # PostgreSQL Database with Security Hardening
+  # =============================================================================
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: kgv-postgres-secure
+    restart: unless-stopped
+    
+    # Security: Run as non-root user
+    user: "999:999"
+    
+    # Security: Read-only root filesystem
+    read_only: true
+    
+    # Security: Temporary filesystems for writable directories
+    tmpfs:
+      - /tmp
+      - /run
+      - /run/postgresql
+    
+    environment:
+      # Credentials from secrets (not environment variables)
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: kgv_production
+      POSTGRES_USER: kgv_admin
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.utf8 --data-checksums"
+      
+      # Security settings
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      
+    secrets:
+      - db_password
+      - db_ssl_cert
+      - db_ssl_key
+      - db_ssl_ca
+    
+    volumes:
+      # Data volume (encrypted at host level)
+      - type: volume
+        source: postgres_data_encrypted
+        target: /var/lib/postgresql/data
+        volume:
+          nocopy: true
+      
+      # Configuration files (read-only)
+      - type: bind
+        source: ./security/postgresql-security.conf
+        target: /etc/postgresql/postgresql.conf
+        read_only: true
+      
+      - type: bind
+        source: ./security/pg_hba_secure.conf
+        target: /etc/postgresql/pg_hba.conf
+        read_only: true
+      
+      # SSL certificates
+      - type: bind
+        source: ./security/ssl
+        target: /var/lib/postgresql/ssl
+        read_only: true
+      
+      # Initialization scripts (read-only)
+      - type: bind
+        source: ./postgresql
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+    
+    # Network: Internal only, no port exposure
+    networks:
+      - database_tier
+    
+    # Security: Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    
+    # Security: Health check with secure credentials
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    
+    # Security: Capabilities
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    
+    # Security: Seccomp profile
+    security_opt:
+      - seccomp:./security/seccomp-postgres.json
+      - no-new-privileges:true
+    
+    # Security: AppArmor/SELinux
+    labels:
+      - "com.kgv.security=high"
+      - "com.kgv.data-classification=confidential"
+      - "com.kgv.gdpr=true"
+
+  # =============================================================================
+  # Redis Cache with Security Hardening
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: kgv-redis-secure
+    restart: unless-stopped
+    
+    # Security: Run as non-root
+    user: "999:999"
+    
+    command: >
+      redis-server
+      --requirepass $$(cat /run/secrets/redis_password)
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --tcp-backlog 511
+      --tcp-keepalive 300
+      --timeout 300
+      --databases 2
+      --stop-writes-on-bgsave-error yes
+      --rdbcompression yes
+      --rdbchecksum yes
+      --slave-read-only yes
+      --repl-diskless-sync no
+      --repl-diskless-sync-delay 5
+      --repl-disable-tcp-nodelay no
+      --slave-priority 100
+      --protected-mode yes
+      --port 0
+      --tls-port 6379
+      --tls-cert-file /tls/redis.crt
+      --tls-key-file /tls/redis.key
+      --tls-ca-cert-file /tls/ca.crt
+      --tls-dh-params-file /tls/redis.dh
+      --tls-protocols "TLSv1.3"
+      --tls-ciphers "HIGH:!aNULL:!MD5"
+      --tls-prefer-server-ciphers yes
+      --tls-session-caching no
+    
+    secrets:
+      - redis_password
+    
+    volumes:
+      - redis_data_encrypted:/data
+      - ./security/redis-tls:/tls:ro
+    
+    networks:
+      - cache_tier
+    
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    
+    security_opt:
+      - no-new-privileges:true
+
+  # =============================================================================
+  # API Service with Security Hardening
+  # =============================================================================
+  api:
+    build:
+      context: ./src/KGV.API
+      dockerfile: Dockerfile.secure
+      target: production
+    container_name: kgv-api-secure
+    restart: unless-stopped
+    
+    # Security: Run as non-root
+    user: "1000:1000"
+    
+    # Security: Read-only filesystem
+    read_only: true
+    
+    tmpfs:
+      - /tmp
+      - /app/temp
+    
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: https://+:5000
+      ASPNETCORE_HTTPS_PORT: 5000
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /certs/api.pfx
+      
+    secrets:
+      - api_db_connection
+      - api_redis_connection
+      - api_jwt_secret
+      - api_cert_password
+    
+    volumes:
+      - ./security/certs:/certs:ro
+      - api_logs_encrypted:/app/logs
+    
+    networks:
+      - application_tier
+      - cache_tier
+      - database_tier
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    
+    cap_drop:
+      - ALL
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # =============================================================================
+  # Web Application with Security Hardening
+  # =============================================================================
+  web:
+    build:
+      context: ./src/KGV.Web
+      dockerfile: Dockerfile.secure
+      target: production
+    container_name: kgv-web-secure
+    restart: unless-stopped
+    
+    user: "1000:1000"
+    read_only: true
+    
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
+    
+    secrets:
+      - web_api_url
+      - nextauth_secret
+    
+    networks:
+      - dmz_tier
+      - application_tier
+    
+    cap_drop:
+      - ALL
+    
+    security_opt:
+      - no-new-privileges:true
+
+  # =============================================================================
+  # Reverse Proxy / WAF
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: kgv-nginx-secure
+    restart: unless-stopped
+    
+    user: "101:101"
+    read_only: true
+    
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    
+    volumes:
+      - ./security/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./security/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./security/nginx/modsecurity:/etc/nginx/modsecurity:ro
+      - ./security/certs:/etc/nginx/certs:ro
+      - nginx_logs_encrypted:/var/log/nginx
+    
+    networks:
+      - dmz_tier
+      - application_tier
+    
+    ports:
+      # Only HTTPS exposed
+      - "443:443"
+    
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    
+    security_opt:
+      - no-new-privileges:true
+
+# =============================================================================
+# NETWORKS - Segmented for Security
+# =============================================================================
+networks:
+  # DMZ - Internet-facing services
+  dmz_tier:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-dmz
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+    labels:
+      - "com.kgv.network.zone=dmz"
+  
+  # Application tier - Internal services
+  application_tier:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-app
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+    internal: true
+    labels:
+      - "com.kgv.network.zone=application"
+  
+  # Cache tier - Redis only
+  cache_tier:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-cache
+    ipam:
+      config:
+        - subnet: 172.20.3.0/24
+    internal: true
+    labels:
+      - "com.kgv.network.zone=cache"
+  
+  # Database tier - PostgreSQL only
+  database_tier:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-db
+    ipam:
+      config:
+        - subnet: 172.20.4.0/24
+    internal: true
+    labels:
+      - "com.kgv.network.zone=database"
+
+# =============================================================================
+# VOLUMES - Encrypted Storage
+# =============================================================================
+volumes:
+  postgres_data_encrypted:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/mnt/encrypted/postgres'
+    labels:
+      - "com.kgv.volume.encryption=aes-256"
+      - "com.kgv.volume.classification=confidential"
+  
+  redis_data_encrypted:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/mnt/encrypted/redis'
+  
+  api_logs_encrypted:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/mnt/encrypted/logs/api'
+  
+  nginx_logs_encrypted:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/mnt/encrypted/logs/nginx'
+
+# =============================================================================
+# SECRETS - External Secret Management
+# =============================================================================
+secrets:
+  # Database secrets
+  db_password:
+    external: true
+    external_name: kgv_db_password_v1
+  db_ssl_cert:
+    external: true
+    external_name: kgv_db_ssl_cert_v1
+  db_ssl_key:
+    external: true
+    external_name: kgv_db_ssl_key_v1
+  db_ssl_ca:
+    external: true
+    external_name: kgv_db_ssl_ca_v1
+  
+  # Redis secrets
+  redis_password:
+    external: true
+    external_name: kgv_redis_password_v1
+  
+  # API secrets
+  api_db_connection:
+    external: true
+    external_name: kgv_api_db_connection_v1
+  api_redis_connection:
+    external: true
+    external_name: kgv_api_redis_connection_v1
+  api_jwt_secret:
+    external: true
+    external_name: kgv_api_jwt_secret_v1
+  api_cert_password:
+    external: true
+    external_name: kgv_api_cert_password_v1
+  
+  # Web secrets
+  web_api_url:
+    external: true
+    external_name: kgv_web_api_url_v1
+  nextauth_secret:
+    external: true
+    external_name: kgv_nextauth_secret_v1

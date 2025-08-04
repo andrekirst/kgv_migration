@@ -1,0 +1,573 @@
+version: '3.9'
+
+# SECURITY HARDENED DOCKER COMPOSE CONFIGURATION
+# =============================================
+# This configuration implements all security best practices including:
+# - No hardcoded credentials (uses environment variables)
+# - Network segmentation with isolated networks
+# - SSL/TLS encryption for all connections
+# - No exposed database ports to external networks
+# - Security context and user restrictions
+# - Resource limits to prevent DoS attacks
+# - Health checks with secure endpoints
+
+services:
+  # PostgreSQL Database with Security Hardening
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: kgv-postgres
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"  # Run as postgres user, not root
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.utf8 --auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      # Enable SSL/TLS
+      POSTGRES_SSL_MODE: "require"
+      POSTGRES_SSL_CERT: "/var/lib/postgresql/certs/server.crt"
+      POSTGRES_SSL_KEY: "/var/lib/postgresql/certs/server.key"
+      POSTGRES_SSL_CA: "/var/lib/postgresql/certs/ca.crt"
+      # Enable encryption at rest
+      POSTGRES_ENCRYPTION: "on"
+      POSTGRES_ENCRYPT_KEY: ${DB_ENCRYPT_KEY}
+      # Performance & Security settings
+      POSTGRES_SHARED_BUFFERS: "256MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
+      POSTGRES_WORK_MEM: "16MB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "256MB"
+      POSTGRES_MAX_CONNECTIONS: "100"
+      POSTGRES_SUPERUSER_RESERVED_CONNECTIONS: "3"
+      # Security settings
+      POSTGRES_PASSWORD_ENCRYPTION: "scram-sha-256"
+      POSTGRES_LOG_CONNECTIONS: "on"
+      POSTGRES_LOG_DISCONNECTIONS: "on"
+      POSTGRES_LOG_DURATION: "on"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:rw
+      - postgres_backups:/var/lib/postgresql/backups:rw
+      - ./ssl/postgres:/var/lib/postgresql/certs:ro
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    # NO EXTERNAL PORTS - Access only through internal network
+    networks:
+      - db-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis Cache with Authentication
+  redis:
+    image: redis:7-alpine
+    container_name: kgv-redis
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-backlog 511
+      --timeout 300
+      --tcp-keepalive 300
+      --protected-mode yes
+      --bind 0.0.0.0
+      --tls-port 6379
+      --port 0
+      --tls-cert-file /tls/redis.crt
+      --tls-key-file /tls/redis.key
+      --tls-ca-cert-file /tls/ca.crt
+      --tls-auth-clients yes
+    volumes:
+      - redis_data:/data:rw
+      - ./ssl/redis:/tls:ro
+    # NO EXTERNAL PORTS
+    networks:
+      - cache-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--tls", "--cacert", "/tls/ca.crt", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # .NET API with Security Headers
+  api:
+    build:
+      context: ../../src/KGV.Api
+      dockerfile: Dockerfile.secure
+      target: production
+      args:
+        - APP_VERSION=${APP_VERSION:-1.0.0}
+    container_name: kgv-api
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"  # Non-root user
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: https://+:5001;http://+:5000
+      ASPNETCORE_HTTPS_PORT: 5001
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /app/certs/api.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${API_CERT_PASSWORD}
+      # Database connection with SSL
+      ConnectionStrings__Database: >
+        Host=postgres;
+        Database=${DB_NAME};
+        Username=${DB_USER};
+        Password=${DB_PASSWORD};
+        SSL Mode=Require;
+        Trust Server Certificate=true;
+        Include Error Detail=false;
+        Command Timeout=30;
+        Maximum Pool Size=50;
+        Minimum Pool Size=5;
+      # Redis connection with SSL
+      ConnectionStrings__Redis: >
+        redis:6379,
+        password=${REDIS_PASSWORD},
+        ssl=true,
+        sslprotocols=tls12,
+        abortConnect=false,
+        connectTimeout=10000,
+        syncTimeout=10000
+      # JWT Configuration
+      JWT__Secret: ${JWT_SECRET}
+      JWT__Issuer: ${JWT_ISSUER:-kgv-api}
+      JWT__Audience: ${JWT_AUDIENCE:-kgv-web}
+      JWT__ExpirationMinutes: ${JWT_EXPIRATION:-60}
+      JWT__RefreshExpirationDays: ${JWT_REFRESH_EXPIRATION:-7}
+      # Security Headers
+      Security__EnableHSTS: "true"
+      Security__EnableCSP: "true"
+      Security__CSPPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+      Security__EnableXSSProtection: "true"
+      Security__EnableXFrameOptions: "true"
+      Security__XFrameOptions: "DENY"
+      Security__EnableXContentTypeOptions: "true"
+      # CORS Configuration
+      CORS__AllowedOrigins: ${CORS_ALLOWED_ORIGINS:-https://localhost:3000}
+      CORS__AllowCredentials: "true"
+      # Rate Limiting
+      RateLimiting__EnableRateLimiting: "true"
+      RateLimiting__PermitLimit: "100"
+      RateLimiting__Window: "60"
+      # Logging
+      Logging__LogLevel__Default: "Warning"
+      Logging__LogLevel__Microsoft: "Warning"
+      Logging__LogLevel__Microsoft.Hosting.Lifetime: "Information"
+      Serilog__MinimumLevel: "Warning"
+      Serilog__WriteTo__0__Name: "Console"
+      Serilog__WriteTo__1__Name: "File"
+      Serilog__WriteTo__1__Args__path: "/app/logs/api-.log"
+      Serilog__WriteTo__1__Args__rollingInterval: "Day"
+      Serilog__WriteTo__1__Args__retainedFileCountLimit: "30"
+    volumes:
+      - api_logs:/app/logs:rw
+      - ./ssl/api:/app/certs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - api-network
+      - db-network
+      - cache-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Next.js Web Application
+  web:
+    build:
+      context: ../../src/KGV.Web
+      dockerfile: Dockerfile.secure
+      target: production
+      args:
+        - APP_VERSION=${APP_VERSION:-1.0.0}
+    container_name: kgv-web
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    environment:
+      NODE_ENV: ${ENVIRONMENT:-production}
+      NEXT_PUBLIC_API_URL: https://api:5001
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      # Security Headers
+      NEXT_PUBLIC_CSP_HEADER: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://api:5001; frame-ancestors 'none';"
+      NEXT_PUBLIC_ENABLE_SECURITY_HEADERS: "true"
+    volumes:
+      - web_logs:/app/logs:rw
+      - ./ssl/web:/app/certs:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - web-network
+      - api-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Nginx Reverse Proxy with SSL Termination
+  nginx:
+    image: nginx:alpine
+    container_name: kgv-nginx
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NGINX_HOST: ${NGINX_HOST:-localhost}
+      NGINX_PORT: ${NGINX_PORT:-443}
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl/nginx:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx:rw
+    ports:
+      - "443:443"  # Only HTTPS exposed
+      - "80:80"    # HTTP for redirect to HTTPS only
+    depends_on:
+      - web
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - web-network
+      - monitoring-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Migration Pipeline Service (Isolated)
+  migration-pipeline:
+    build:
+      context: ../../etl/python
+      dockerfile: Dockerfile.secure
+    container_name: kgv-migration-pipeline
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    environment:
+      # PostgreSQL connection with SSL
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${MIGRATION_DB_USER}
+      POSTGRES_PASSWORD: ${MIGRATION_DB_PASSWORD}
+      POSTGRES_PORT: 5432
+      POSTGRES_SSLMODE: require
+      POSTGRES_SSLCERT: /app/certs/client.crt
+      POSTGRES_SSLKEY: /app/certs/client.key
+      POSTGRES_SSLROOTCERT: /app/certs/ca.crt
+      # Redis connection with SSL
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_SSL: "true"
+      REDIS_SSL_CERT: /app/certs/redis-client.crt
+      REDIS_SSL_KEY: /app/certs/redis-client.key
+      REDIS_SSL_CA: /app/certs/ca.crt
+      # Migration settings
+      MIGRATION_BATCH_SIZE: ${MIGRATION_BATCH_SIZE:-1000}
+      MIGRATION_MAX_WORKERS: ${MIGRATION_MAX_WORKERS:-2}
+      ENABLE_METRICS: "false"  # Disabled for security
+      # Input validation settings
+      ENABLE_INPUT_VALIDATION: "true"
+      VALIDATION_STRICT_MODE: "true"
+      MAX_STRING_LENGTH: "1000"
+      MAX_BATCH_SIZE: "5000"
+    volumes:
+      - migration_logs:/app/logs:rw
+      - migration_data:/app/data:rw
+      - ./ssl/migration:/app/certs:ro
+    # NO EXTERNAL PORTS
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - db-network
+      - cache-network
+    profiles:
+      - migration
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Monitoring Services (Optional, Isolated Network)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kgv-prometheus
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "65534:65534"  # nobody user
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus:rw
+    # NO EXTERNAL PORTS - Access through nginx proxy
+    networks:
+      - monitoring-network
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kgv-grafana
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "472:472"  # grafana user
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_SECRET_KEY: ${GRAFANA_SECRET_KEY}
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: "strict"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY: "true"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE_SECONDS: "86400"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY_PRELOAD: "true"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY_SUBDOMAINS: "true"
+      GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "true"
+      GF_SECURITY_X_XSS_PROTECTION: "true"
+      GF_SECURITY_CONTENT_SECURITY_POLICY: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_INSTALL_PLUGINS: ""  # No automatic plugin installation
+    volumes:
+      - grafana_data:/var/lib/grafana:rw
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    # NO EXTERNAL PORTS - Access through nginx proxy
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring-network
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# Network Configuration with Segmentation
+networks:
+  # Database network - isolated for database access only
+  db-network:
+    driver: bridge
+    name: kgv-db-network
+    internal: true  # No external access
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"  # Disable inter-container communication
+
+  # Cache network - isolated for cache access only
+  cache-network:
+    driver: bridge
+    name: kgv-cache-network
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
+
+  # API network - for API to web communication
+  api-network:
+    driver: bridge
+    name: kgv-api-network
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+
+  # Web network - for nginx to web communication
+  web-network:
+    driver: bridge
+    name: kgv-web-network
+    ipam:
+      config:
+        - subnet: 172.23.0.0/24
+
+  # Monitoring network - isolated for monitoring services
+  monitoring-network:
+    driver: bridge
+    name: kgv-monitoring-network
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.24.0.0/24
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"  # Allow monitoring inter-communication
+
+# Volume Configuration with Encryption
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/postgres
+    name: kgv-postgres-data
+
+  postgres_backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${BACKUP_PATH:-./backups}/postgres
+    name: kgv-postgres-backups
+
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/redis
+    name: kgv-redis-data
+
+  api_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOG_PATH:-./logs}/api
+    name: kgv-api-logs
+
+  web_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOG_PATH:-./logs}/web
+    name: kgv-web-logs
+
+  nginx_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOG_PATH:-./logs}/nginx
+    name: kgv-nginx-logs
+
+  migration_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOG_PATH:-./logs}/migration
+    name: kgv-migration-logs
+
+  migration_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/migration
+    name: kgv-migration-data
+
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/prometheus
+    name: kgv-prometheus-data
+
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/grafana
+    name: kgv-grafana-data

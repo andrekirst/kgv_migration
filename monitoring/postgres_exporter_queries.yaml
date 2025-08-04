@@ -1,0 +1,305 @@
+# =============================================================================
+# PostgreSQL Exporter Custom Queries for KGV Migration Monitoring
+# =============================================================================
+
+# Migration-specific metrics
+kgv_migration_table_counts:
+  query: |
+    SELECT 
+      schemaname,
+      tablename,
+      n_live_tup as live_tuples,
+      n_dead_tup as dead_tuples,
+      n_tup_ins as inserts,
+      n_tup_upd as updates,
+      n_tup_del as deletes
+    FROM pg_stat_user_tables
+    WHERE schemaname IN ('public', 'migration_staging')
+  metrics:
+    - schemaname:
+        usage: "LABEL"
+        description: "Schema name"
+    - tablename:
+        usage: "LABEL"
+        description: "Table name"
+    - live_tuples:
+        usage: "GAUGE"
+        description: "Number of live tuples"
+    - dead_tuples:
+        usage: "GAUGE"
+        description: "Number of dead tuples"
+    - inserts:
+        usage: "COUNTER"
+        description: "Number of inserts"
+    - updates:
+        usage: "COUNTER"
+        description: "Number of updates"
+    - deletes:
+        usage: "COUNTER"
+        description: "Number of deletes"
+
+# Migration staging table metrics
+kgv_migration_staging_status:
+  query: |
+    SELECT 
+      table_name,
+      COUNT(*) as total_records,
+      COUNT(DISTINCT migration_batch_id) as batch_count,
+      MAX(migration_timestamp) as latest_batch
+    FROM (
+      SELECT 'raw_aktenzeichen' as table_name, migration_batch_id, migration_timestamp FROM migration_staging.raw_aktenzeichen
+      UNION ALL
+      SELECT 'raw_antrag', migration_batch_id, migration_timestamp FROM migration_staging.raw_antrag
+      UNION ALL
+      SELECT 'raw_bezirk', migration_batch_id, migration_timestamp FROM migration_staging.raw_bezirk
+      UNION ALL
+      SELECT 'raw_eingangsnummer', migration_batch_id, migration_timestamp FROM migration_staging.raw_eingangsnummer
+      UNION ALL
+      SELECT 'raw_katasterbezirk', migration_batch_id, migration_timestamp FROM migration_staging.raw_katasterbezirk
+      UNION ALL
+      SELECT 'raw_kennungen', migration_batch_id, migration_timestamp FROM migration_staging.raw_kennungen
+      UNION ALL
+      SELECT 'raw_mischenfelder', migration_batch_id, migration_timestamp FROM migration_staging.raw_mischenfelder
+      UNION ALL
+      SELECT 'raw_personen', migration_batch_id, migration_timestamp FROM migration_staging.raw_personen
+      UNION ALL
+      SELECT 'raw_verlauf', migration_batch_id, migration_timestamp FROM migration_staging.raw_verlauf
+    ) staging_data
+    GROUP BY table_name
+  metrics:
+    - table_name:
+        usage: "LABEL"
+        description: "Staging table name"
+    - total_records:
+        usage: "GAUGE"
+        description: "Total records in staging table"
+    - batch_count:
+        usage: "GAUGE"
+        description: "Number of migration batches"
+    - latest_batch:
+        usage: "GAUGE"
+        description: "Timestamp of latest batch"
+
+# Migration log metrics
+kgv_migration_log_status:
+  query: |
+    SELECT 
+      table_name,
+      operation,
+      status,
+      COUNT(*) as log_entries,
+      SUM(records_processed) as total_processed,
+      SUM(records_success) as total_success,
+      SUM(records_error) as total_errors,
+      AVG(duration_seconds) as avg_duration_seconds
+    FROM migration_staging.migration_log
+    WHERE started_at >= NOW() - INTERVAL '24 hours'
+    GROUP BY table_name, operation, status
+  metrics:
+    - table_name:
+        usage: "LABEL"
+        description: "Table name"
+    - operation:
+        usage: "LABEL"
+        description: "Migration operation"
+    - status:
+        usage: "LABEL"
+        description: "Operation status"
+    - log_entries:
+        usage: "COUNTER"
+        description: "Number of log entries"
+    - total_processed:
+        usage: "COUNTER"
+        description: "Total records processed"
+    - total_success:
+        usage: "COUNTER"
+        description: "Total successful records"
+    - total_errors:
+        usage: "COUNTER"
+        description: "Total error records"
+    - avg_duration_seconds:
+        usage: "GAUGE"
+        description: "Average operation duration in seconds"
+
+# Data quality metrics
+kgv_data_quality_metrics:
+  query: |
+    SELECT 
+      'applications' as table_name,
+      'total_applications' as metric_name,
+      COUNT(*) as metric_value
+    FROM applications
+    UNION ALL
+    SELECT 
+      'applications',
+      'active_applications',
+      COUNT(*)
+    FROM applications WHERE is_active = true
+    UNION ALL
+    SELECT 
+      'applications',
+      'applications_with_email',
+      COUNT(*)
+    FROM applications WHERE email IS NOT NULL
+    UNION ALL
+    SELECT 
+      'applications',
+      'applications_invalid_email',
+      COUNT(*)
+    FROM applications 
+    WHERE email IS NOT NULL 
+    AND email !~ '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    UNION ALL
+    SELECT 
+      'applications',
+      'applications_invalid_postal_code',
+      COUNT(*)
+    FROM applications 
+    WHERE postal_code IS NOT NULL 
+    AND postal_code !~ '^[0-9]{5}$'
+    UNION ALL
+    SELECT 
+      'application_history',
+      'total_history_entries',
+      COUNT(*)
+    FROM application_history
+    UNION ALL
+    SELECT 
+      'users',
+      'total_users',
+      COUNT(*)
+    FROM users
+    UNION ALL
+    SELECT 
+      'users',
+      'active_users',
+      COUNT(*)
+    FROM users WHERE is_active = true
+  metrics:
+    - table_name:
+        usage: "LABEL"
+        description: "Table name"
+    - metric_name:
+        usage: "LABEL"
+        description: "Metric name"
+    - metric_value:
+        usage: "GAUGE"
+        description: "Metric value"
+
+# Database size and growth metrics
+kgv_database_size_metrics:
+  query: |
+    SELECT 
+      schemaname,
+      tablename,
+      pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size_pretty,
+      pg_total_relation_size(schemaname||'.'||tablename) as size_bytes
+    FROM pg_tables 
+    WHERE schemaname IN ('public', 'migration_staging')
+    ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+  metrics:
+    - schemaname:
+        usage: "LABEL"
+        description: "Schema name"
+    - tablename:
+        usage: "LABEL"  
+        description: "Table name"
+    - size_bytes:
+        usage: "GAUGE"
+        description: "Table size in bytes"
+
+# Index usage metrics
+kgv_index_usage_metrics:
+  query: |
+    SELECT 
+      schemaname,
+      tablename,
+      indexname,
+      idx_scan,
+      idx_tup_read,
+      idx_tup_fetch
+    FROM pg_stat_user_indexes
+    WHERE schemaname IN ('public', 'migration_staging')
+    ORDER BY idx_scan DESC
+  metrics:
+    - schemaname:
+        usage: "LABEL"
+        description: "Schema name"
+    - tablename:
+        usage: "LABEL"
+        description: "Table name"
+    - indexname:
+        usage: "LABEL"
+        description: "Index name"
+    - idx_scan:
+        usage: "COUNTER"
+        description: "Number of index scans"
+    - idx_tup_read:
+        usage: "COUNTER"
+        description: "Number of index entries returned by scans"
+    - idx_tup_fetch:
+        usage: "COUNTER"
+        description: "Number of live table rows fetched by index scans"
+
+# Connection and session metrics
+kgv_connection_metrics:
+  query: |
+    SELECT 
+      state,
+      COUNT(*) as connection_count
+    FROM pg_stat_activity
+    WHERE datname = 'kgv_development'
+    GROUP BY state
+  metrics:
+    - state:
+        usage: "LABEL"
+        description: "Connection state"
+    - connection_count:
+        usage: "GAUGE"
+        description: "Number of connections"
+
+# Lock metrics
+kgv_lock_metrics:
+  query: |
+    SELECT 
+      mode,
+      locktype,
+      COUNT(*) as lock_count
+    FROM pg_locks
+    GROUP BY mode, locktype
+  metrics:
+    - mode:
+        usage: "LABEL"
+        description: "Lock mode"
+    - locktype:
+        usage: "LABEL"
+        description: "Lock type"
+    - lock_count:
+        usage: "GAUGE"
+        description: "Number of locks"
+
+# Replication lag (if applicable)
+kgv_replication_lag:
+  query: |
+    SELECT 
+      client_addr,
+      state,
+      EXTRACT(EPOCH FROM (now() - backend_start)) as connection_age_seconds,
+      CASE 
+        WHEN state = 'streaming' THEN 0
+        ELSE EXTRACT(EPOCH FROM (now() - state_change))
+      END as lag_seconds
+    FROM pg_stat_replication
+  metrics:
+    - client_addr:
+        usage: "LABEL"
+        description: "Client address"
+    - state:
+        usage: "LABEL"
+        description: "Replication state"
+    - connection_age_seconds:
+        usage: "GAUGE"
+        description: "Age of replication connection in seconds"
+    - lag_seconds:
+        usage: "GAUGE"
+        description: "Replication lag in seconds"
