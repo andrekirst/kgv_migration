@@ -1,0 +1,464 @@
+name: Git Flow Automation
+
+on:
+  push:
+    branches: 
+      - 'feature/**'
+      - 'bugfix/**'
+      - 'hotfix/**'
+      - 'release/**'
+      - develop
+      - main
+  pull_request:
+    branches: 
+      - develop
+      - main
+    types: [opened, synchronize, reopened, closed]
+  issues:
+    types: [opened, assigned, labeled]
+
+env:
+  NODE_VERSION: '20'
+  DOTNET_VERSION: '9.0'
+
+jobs:
+  # Extract metadata from branch names and issues
+  extract-metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      branch-type: ${{ steps.branch-info.outputs.type }}
+      issue-number: ${{ steps.branch-info.outputs.issue }}
+      is-feature: ${{ steps.branch-info.outputs.is-feature }}
+      is-hotfix: ${{ steps.branch-info.outputs.is-hotfix }}
+      is-release: ${{ steps.branch-info.outputs.is-release }}
+    steps:
+      - name: Extract Branch Information
+        id: branch-info
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "Full branch name: $BRANCH_NAME"
+          
+          # Extract branch type
+          if [[ $BRANCH_NAME == feature/* ]]; then
+            echo "type=feature" >> $GITHUB_OUTPUT
+            echo "is-feature=true" >> $GITHUB_OUTPUT
+          elif [[ $BRANCH_NAME == bugfix/* ]]; then
+            echo "type=bugfix" >> $GITHUB_OUTPUT
+            echo "is-feature=true" >> $GITHUB_OUTPUT
+          elif [[ $BRANCH_NAME == hotfix/* ]]; then
+            echo "type=hotfix" >> $GITHUB_OUTPUT
+            echo "is-hotfix=true" >> $GITHUB_OUTPUT
+          elif [[ $BRANCH_NAME == release/* ]]; then
+            echo "type=release" >> $GITHUB_OUTPUT
+            echo "is-release=true" >> $GITHUB_OUTPUT
+          else
+            echo "type=other" >> $GITHUB_OUTPUT
+          fi
+          
+          # Extract issue number from branch name (format: prefix/ISSUE-123-description)
+          ISSUE_NUMBER=$(echo $BRANCH_NAME | grep -oP 'ISSUE-\K\d+' || echo "")
+          echo "issue=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "Extracted issue number: $ISSUE_NUMBER"
+
+  # Validate branch naming conventions
+  validate-branch-name:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop'
+    steps:
+      - name: Validate Branch Name Format
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          
+          # Define valid patterns
+          FEATURE_PATTERN="^feature/ISSUE-[0-9]+-[a-z0-9-]+$"
+          BUGFIX_PATTERN="^bugfix/ISSUE-[0-9]+-[a-z0-9-]+$"
+          HOTFIX_PATTERN="^hotfix/v[0-9]+\.[0-9]+\.[0-9]+-[a-z0-9-]+$"
+          RELEASE_PATTERN="^release/v[0-9]+\.[0-9]+\.[0-9]+$"
+          
+          if [[ $BRANCH_NAME =~ $FEATURE_PATTERN ]] || \
+             [[ $BRANCH_NAME =~ $BUGFIX_PATTERN ]] || \
+             [[ $BRANCH_NAME =~ $HOTFIX_PATTERN ]] || \
+             [[ $BRANCH_NAME =~ $RELEASE_PATTERN ]]; then
+            echo "✅ Branch name '$BRANCH_NAME' follows naming convention"
+          else
+            echo "❌ Branch name '$BRANCH_NAME' does not follow naming convention"
+            echo ""
+            echo "Valid patterns:"
+            echo "  - feature/ISSUE-123-short-description"
+            echo "  - bugfix/ISSUE-123-short-description"  
+            echo "  - hotfix/v1.2.3-short-description"
+            echo "  - release/v1.2.3"
+            exit 1
+          fi
+
+  # Update issue status based on branch activity
+  update-issue-status:
+    runs-on: ubuntu-latest
+    needs: extract-metadata
+    if: needs.extract-metadata.outputs.issue-number != ''
+    steps:
+      - name: Update Issue Status - In Progress
+        if: github.event_name == 'push' && needs.extract-metadata.outputs.is-feature == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = ${{ needs.extract-metadata.outputs.issue-number }};
+            
+            // Add "in-progress" label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['in-progress']
+            });
+            
+            // Add comment about branch creation
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `🌿 Development started on branch \`${{ github.ref_name }}\`\n\n` +
+                    `📋 This issue is now in progress. Branch: [\`${{ github.ref_name }}\`](https://github.com/${{ github.repository }}/tree/${{ github.ref_name }})`
+            });
+
+      - name: Update Issue Status - Ready for Review
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = ${{ needs.extract-metadata.outputs.issue-number }};
+            
+            // Remove "in-progress" and add "ready-for-review"
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                name: 'in-progress'
+              });
+            } catch (error) {
+              console.log('Label "in-progress" not found, continuing...');
+            }
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['ready-for-review']
+            });
+            
+            // Add comment about PR creation
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `🔄 Pull Request created: #${{ github.event.pull_request.number }}\n\n` +
+                    `📋 This issue is ready for review. Please review the changes and provide feedback.`
+            });
+
+  # Run tests for feature branches
+  test-feature-branch:
+    runs-on: ubuntu-latest
+    needs: extract-metadata
+    if: needs.extract-metadata.outputs.is-feature == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: KGV_Test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Restore .NET dependencies
+        run: dotnet restore src/KGV.sln
+
+      - name: Build .NET solution
+        run: dotnet build src/KGV.sln --no-restore --configuration Release
+
+      - name: Run .NET tests
+        run: dotnet test src/KGV.sln --no-build --configuration Release --verbosity normal
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Database=KGV_Test;Username=test_user;Password=test_password"
+          ConnectionStrings__Redis: "localhost:6379"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: "http://localhost:5000"
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Update Issue with Test Results
+        if: needs.extract-metadata.outputs.issue-number != '' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = ${{ needs.extract-metadata.outputs.issue-number }};
+            const jobStatus = '${{ job.status }}';
+            const conclusion = jobStatus === 'success' ? '✅ passed' : '❌ failed';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `🧪 Tests ${conclusion} for branch \`${{ github.ref_name }}\`\n\n` +
+                    `**Build Status**: ${jobStatus}\n` +
+                    `**Commit**: \`${{ github.sha }}\`\n` +
+                    `[View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            });
+
+  # Container build and security scan
+  container-security-scan:
+    runs-on: ubuntu-latest
+    needs: extract-metadata
+    if: needs.extract-metadata.outputs.is-feature == 'true' || needs.extract-metadata.outputs.is-release == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API Container
+        run: |
+          docker build -t kgv-api:${{ github.sha }} -f src/KGV.API/Dockerfile .
+
+      - name: Build Frontend Container
+        run: |
+          docker build -t kgv-frontend:${{ github.sha }} -f frontend/Dockerfile ./frontend
+
+      - name: Run Trivy vulnerability scanner - API
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'kgv-api:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-api-results.sarif'
+
+      - name: Run Trivy vulnerability scanner - Frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'kgv-frontend:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: '.'
+
+  # Release branch validation and preparation
+  prepare-release:
+    runs-on: ubuntu-latest
+    needs: extract-metadata
+    if: needs.extract-metadata.outputs.is-release == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from branch
+        id: version
+        run: |
+          VERSION=$(echo ${{ github.ref_name }} | sed 's/release\/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Preparing release for version: $VERSION"
+
+      - name: Validate version format
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: X.Y.Z (semantic versioning)"
+            exit 1
+          fi
+          echo "✅ Version format is valid: $VERSION"
+
+      - name: Update version files
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          
+          # Update package.json
+          if [ -f "frontend/package.json" ]; then
+            sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
+            echo "✅ Updated frontend/package.json"
+          fi
+          
+          # Update .NET project file
+          if [ -f "src/KGV.API/KGV.API.csproj" ]; then
+            sed -i "s/<Version>.*<\/Version>/<Version>$VERSION<\/Version>/" src/KGV.API/KGV.API.csproj
+            echo "✅ Updated src/KGV.API/KGV.API.csproj"
+          fi
+          
+          # Update docker-compose.yml
+          if [ -f "docker-compose.yml" ]; then
+            sed -i "s/image: kgv-api:.*/image: kgv-api:v$VERSION/" docker-compose.yml
+            sed -i "s/image: kgv-frontend:.*/image: kgv-frontend:v$VERSION/" docker-compose.yml
+            echo "✅ Updated docker-compose.yml"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "# Release v${{ steps.version.outputs.version }}" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## What's Changed" >> RELEASE_NOTES.md
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            echo "Generating changelog since $LAST_TAG"
+            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" --grep="feat:" --grep="fix:" --grep="perf:" >> RELEASE_NOTES.md
+          else
+            echo "No previous tags found, generating changelog from first commit"
+            git log --pretty=format:"- %s (%h)" --grep="feat:" --grep="fix:" --grep="perf:" >> RELEASE_NOTES.md
+          fi
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$LAST_TAG...v${{ steps.version.outputs.version }}" >> RELEASE_NOTES.md
+
+      - name: Commit version updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "chore(release): prepare v${{ steps.version.outputs.version }}" || exit 0
+          git push
+
+  # Hotfix branch validation
+  validate-hotfix:
+    runs-on: ubuntu-latest
+    needs: extract-metadata
+    if: needs.extract-metadata.outputs.is-hotfix == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate hotfix branch
+        run: |
+          echo "🚨 Hotfix branch detected: ${{ github.ref_name }}"
+          echo "Running critical validation for hotfix..."
+          
+          # Check if branch is based on main
+          git fetch origin main
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          MAIN_HEAD=$(git rev-parse origin/main)
+          
+          if [ "$MERGE_BASE" != "$MAIN_HEAD" ]; then
+            echo "⚠️ Warning: Hotfix branch is not based on latest main branch"
+          else
+            echo "✅ Hotfix branch is properly based on main"
+          fi
+
+      - name: Notify team about hotfix
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Create an issue for hotfix tracking
+            const { data: issue } = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Hotfix Tracking: ${{ github.ref_name }}`,
+              body: `## Hotfix Information\n\n` +
+                    `**Branch**: \`${{ github.ref_name }}\`\n` +
+                    `**Commit**: \`${{ github.sha }}\`\n` +
+                    `**Author**: @${{ github.actor }}\n\n` +
+                    `## Status\n` +
+                    `- [ ] Development complete\n` +
+                    `- [ ] Testing complete\n` +
+                    `- [ ] Code review approved\n` +
+                    `- [ ] Ready for production deployment\n\n` +
+                    `## Deployment Checklist\n` +
+                    `- [ ] Staging deployment verified\n` +
+                    `- [ ] Production deployment approved\n` +
+                    `- [ ] Monitoring alerts configured\n` +
+                    `- [ ] Rollback plan documented`,
+              labels: ['hotfix', 'priority-critical', 'tracking']
+            });
+            
+            console.log(`Created hotfix tracking issue: #${issue.number}`);
+
+  # Auto-merge PRs for documentation
+  auto-merge-docs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'opened' && startsWith(github.head_ref, 'docs/')
+    steps:
+      - name: Auto-approve documentation PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              event: 'APPROVE',
+              body: '✅ Auto-approved: Documentation changes only'
+            });
+
+      - name: Enable auto-merge
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              merge_method: 'squash'
+            });
+
+  # Cleanup merged branches
+  cleanup-merged-branches:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    steps:
+      - name: Delete merged branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            
+            // Don't delete main, develop, or release/hotfix branches
+            if (branchName === 'main' || branchName === 'develop' || 
+                branchName.startsWith('release/') || branchName.startsWith('hotfix/')) {
+              console.log(`Skipping deletion of protected branch: ${branchName}`);
+              return;
+            }
+            
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `heads/${branchName}`
+              });
+              console.log(`✅ Deleted merged branch: ${branchName}`);
+            } catch (error) {
+              console.log(`⚠️ Could not delete branch ${branchName}: ${error.message}`);
+            }

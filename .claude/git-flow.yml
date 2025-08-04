@@ -1,0 +1,278 @@
+# Git Flow Configuration for KGV Migration Project
+# This file configures the automated Git Flow workflow system
+
+# Core Git Flow Settings
+git_flow:
+  enabled: true
+  main_branch: main
+  develop_branch: develop
+  
+  # Branch Prefixes
+  feature_prefix: "feature/"
+  release_prefix: "release/"
+  hotfix_prefix: "hotfix/"
+  bugfix_prefix: "bugfix/"
+  
+  # Naming Conventions
+  issue_branch_format: "{prefix}ISSUE-{number}-{description}"
+  max_branch_name_length: 50
+  description_max_words: 4
+  
+  # German character handling
+  character_mapping:
+    "ä": "ae"
+    "ö": "oe" 
+    "ü": "ue"
+    "ß": "ss"
+    "Ä": "AE"
+    "Ö": "OE"
+    "Ü": "UE"
+
+# GitHub Integration Settings
+github:
+  enabled: true
+  repository: "andrekirst/kgv_migration"
+  token_env: "GITHUB_TOKEN"
+  
+  # Branch Management
+  auto_create_branch: true
+  auto_link_issues: true
+  auto_create_pr: true
+  delete_merged_branches: true
+  
+  # Pull Request Configuration
+  pr_template: ".github/pull_request_template.md"
+  auto_assign_reviewers: true
+  default_reviewers: ["@andrekirst"]
+  
+  # Labels and Milestones
+  auto_add_labels: true
+  default_labels:
+    feature: ["enhancement", "needs-review"]
+    bugfix: ["bug", "needs-review"] 
+    hotfix: ["hotfix", "priority-critical"]
+  
+  # Branch Protection
+  respect_branch_protection: true
+  required_status_checks: true
+  enforce_linear_history: false
+
+# Commit Message Configuration
+commits:
+  conventional_commits: true
+  issue_reference_required: true
+  
+  # Template for commit messages
+  commit_message_template: |
+    {type}({scope}): {description}
+    
+    {body}
+    
+    Closes #{issue_number}
+  
+  # Conventional commit types
+  allowed_types:
+    - feat      # New feature
+    - fix       # Bug fix
+    - docs      # Documentation
+    - style     # Code style changes
+    - refactor  # Code refactoring
+    - test      # Adding tests
+    - chore     # Maintenance tasks
+    - perf      # Performance improvements
+    - ci        # CI/CD changes
+    - build     # Build system changes
+  
+  # Pre-commit validation
+  pre_commit_hooks:
+    - branch_name_validation
+    - commit_message_format
+    - issue_reference_check
+    - lint_staged_files
+    - no_direct_push_to_main
+
+# Workflow Automation
+automation:
+  # Post-action behaviors
+  auto_checkout_develop_after_finish: true
+  auto_delete_merged_branches: true
+  auto_pull_before_create: true
+  create_draft_pr_for_wip: false
+  
+  # Stale branch cleanup
+  stale_branch_days: 30
+  auto_cleanup_stale_branches: false  # Manual cleanup for safety
+  
+  # Notifications
+  notify_on_pr_creation: true
+  notify_on_merge_conflicts: true
+  notify_on_ci_failure: true
+
+# Project-specific settings for KGV Migration
+project:
+  name: "KGV Migration"
+  description: "Legacy VB.NET to modern web application migration"
+  
+  # Issue categorization
+  issue_categories:
+    infrastructure:
+      branch_prefix: "infra/"
+      labels: ["infrastructure", "devops"]
+      reviewers: ["@andrekirst"]
+    
+    database:
+      branch_prefix: "db/"
+      labels: ["database", "migration"]
+      reviewers: ["@andrekirst"]
+    
+    frontend:
+      branch_prefix: "frontend/"
+      labels: ["frontend", "nextjs", "tailwind"]
+      reviewers: ["@andrekirst"]
+    
+    backend:
+      branch_prefix: "backend/"
+      labels: ["backend", "dotnet", "api"]
+      reviewers: ["@andrekirst"]
+    
+    documentation:
+      branch_prefix: "docs/"
+      labels: ["documentation"]
+      auto_merge: true  # Docs can be auto-merged
+  
+  # Environment-specific settings
+  environments:
+    development:
+      auto_deploy: true
+      require_tests: false
+    
+    staging:
+      auto_deploy: false
+      require_tests: true
+      require_reviews: 1
+    
+    production:
+      auto_deploy: false
+      require_tests: true
+      require_reviews: 2
+      require_signed_commits: true
+
+# Integration Settings
+integrations:
+  # Docker Compose integration
+  docker_compose:
+    enabled: true
+    config_file: "docker-compose.yml"
+    auto_rebuild_on_dependency_changes: true
+  
+  # VS Code integration
+  vscode:
+    enabled: true
+    status_bar_info: true
+    command_palette_commands: true
+  
+  # Slack notifications (optional)
+  slack:
+    enabled: false
+    webhook_url_env: "SLACK_WEBHOOK_URL"
+    channels:
+      general: "#kgv-migration"
+      releases: "#releases"
+      hotfixes: "#alerts"
+  
+  # Teams notifications (optional)
+  teams:
+    enabled: false
+    webhook_url_env: "TEAMS_WEBHOOK_URL"
+
+# Security Settings
+security:
+  # Secret scanning
+  scan_for_secrets_pre_commit: true
+  allowed_secret_patterns: []
+  
+  # Branch protection
+  protect_main_branch: true
+  protect_develop_branch: true
+  
+  # Required checks
+  require_signed_commits: false  # Can be enabled for production
+  require_linear_history: false
+  
+  # Vulnerability scanning
+  dependabot_auto_merge: false
+  security_auto_merge: false
+
+# Development Workflow Preferences
+workflow:
+  # Default behaviors
+  default_base_branch: "develop"
+  merge_strategy: "squash"  # squash, merge, rebase
+  delete_head_branches: true
+  
+  # Feature workflow
+  feature_workflow:
+    create_draft_pr: false
+    auto_assign_self: true
+    run_ci_on_draft: false
+  
+  # Release workflow
+  release_workflow:
+    update_version_files: true
+    generate_changelog: true
+    create_release_notes: true
+    version_files:
+      - "package.json"
+      - "src/KGV.API/KGV.API.csproj"
+      - "docker-compose.yml"
+  
+  # Hotfix workflow
+  hotfix_workflow:
+    emergency_bypass_reviews: false
+    immediate_notification: true
+    auto_create_tracking_issue: true
+
+# Monitoring and Analytics
+monitoring:
+  # Metrics tracking
+  track_metrics: true
+  metrics_retention_days: 90
+  
+  # Performance monitoring
+  track_build_times: true
+  track_deployment_times: true
+  track_pr_cycle_times: true
+  
+  # Quality metrics
+  track_test_coverage: true
+  track_code_quality_scores: true
+  track_security_scan_results: true
+
+# Error Handling and Recovery
+error_handling:
+  # Retry settings
+  max_retries: 3
+  retry_delay_seconds: 5
+  exponential_backoff: true
+  
+  # Fallback behaviors
+  offline_mode_enabled: true
+  cache_github_data: true
+  cache_duration_hours: 24
+  
+  # Recovery options
+  auto_recover_from_conflicts: false
+  backup_branches_before_operations: true
+  enable_rollback_operations: true
+
+# Logging and Debugging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARN, ERROR
+  log_file: ".claude/logs/git-flow.log"
+  max_log_size_mb: 10
+  rotate_logs: true
+  
+  # Debug options
+  verbose_github_api_calls: false
+  log_git_commands: false
+  log_branch_operations: true
