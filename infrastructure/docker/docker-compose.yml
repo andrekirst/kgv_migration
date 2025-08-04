@@ -1,0 +1,282 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: kgv-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kgv_development
+      POSTGRES_USER: kgv_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-DevPassword123!}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.utf8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kgv_admin -d kgv_development"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kgv-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: kgv-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-RedisDevPass123!}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kgv-network
+
+  # .NET API
+  api:
+    build:
+      context: ../../src/KGV.Api
+      dockerfile: Dockerfile
+      target: development
+    container_name: kgv-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5000
+      ConnectionStrings__Database: "Host=postgres;Database=kgv_development;Username=kgv_admin;Password=${DB_PASSWORD:-DevPassword123!}"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD:-RedisDevPass123!}"
+      JWT__Secret: ${JWT_SECRET:-DevJwtSecret123!DevJwtSecret123!}
+      JWT__Issuer: "kgv-api-dev"
+      JWT__Audience: "kgv-web-dev"
+      Logging__LogLevel__Default: "Information"
+      Logging__LogLevel__Microsoft: "Warning"
+      Logging__LogLevel__Microsoft.Hosting.Lifetime: "Information"
+    volumes:
+      - ../../src/KGV.Api:/app
+      - api_logs:/app/logs
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kgv-network
+
+  # Next.js Web Application
+  web:
+    build:
+      context: ../../src/KGV.Web
+      dockerfile: Dockerfile
+      target: development
+    container_name: kgv-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://api:5000
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-DevNextAuthSecret123!}
+    volumes:
+      - ../../src/KGV.Web:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kgv-network
+
+  # pgAdmin for Database Management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: kgv-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@kgv.local
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-PgAdminPass123!}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - kgv-network
+    profiles:
+      - tools
+
+  # Adminer (lightweight DB management)
+  adminer:
+    image: adminer:latest
+    container_name: kgv-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - kgv-network
+    profiles:
+      - tools
+
+  # Mailhog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: kgv-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    networks:
+      - kgv-network
+    profiles:
+      - tools
+
+  # Seq for Centralized Logging
+  seq:
+    image: datalust/seq:latest
+    container_name: kgv-seq
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: 'Y'
+      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_PASSWORD:-SeqAdminPass123!}
+    volumes:
+      - seq_data:/data
+    ports:
+      - "5341:80"   # Web UI
+      - "5342:5341" # Ingestion API
+    networks:
+      - kgv-network
+    profiles:
+      - monitoring
+
+  # Prometheus for Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kgv-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - kgv-network
+    profiles:
+      - monitoring
+
+  # Grafana for Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kgv-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-GrafanaPass123!}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - kgv-network
+    profiles:
+      - monitoring
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: kgv-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686" # Web UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    networks:
+      - kgv-network
+    profiles:
+      - monitoring
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: kgv-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Prometheus metrics
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # Health check
+      - "55679:55679" # ZPages
+    depends_on:
+      - jaeger
+      - prometheus
+    networks:
+      - kgv-network
+    profiles:
+      - monitoring
+
+networks:
+  kgv-network:
+    driver: bridge
+    name: kgv-network
+
+volumes:
+  postgres_data:
+    name: kgv-postgres-data
+  redis_data:
+    name: kgv-redis-data
+  api_logs:
+    name: kgv-api-logs
+  pgadmin_data:
+    name: kgv-pgadmin-data
+  seq_data:
+    name: kgv-seq-data
+  prometheus_data:
+    name: kgv-prometheus-data
+  grafana_data:
+    name: kgv-grafana-data

@@ -1,0 +1,467 @@
+name: KGV Migration CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '20.x'
+  TERRAFORM_VERSION: '1.5.7'
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  # Security Scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'KGV-Migration'
+          path: '.'
+          format: 'HTML'
+
+  # Backend Build and Test
+  backend-build:
+    name: Backend Build & Test
+    runs-on: ubuntu-latest
+    needs: security-scan
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      
+      - name: Restore dependencies
+        run: dotnet restore src/KGV.Api/KGV.Api.csproj
+      
+      - name: Build
+        run: dotnet build src/KGV.Api/KGV.Api.csproj --configuration Release --no-restore
+      
+      - name: Run tests
+        run: |
+          dotnet test tests/KGV.Api.Tests/KGV.Api.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/**/coverage.cobertura.xml
+          flags: backend
+          name: backend-coverage
+      
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # Frontend Build and Test
+  frontend-build:
+    name: Frontend Build & Test
+    runs-on: ubuntu-latest
+    needs: security-scan
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: src/KGV.Web/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+        working-directory: src/KGV.Web
+      
+      - name: Run linting
+        run: npm run lint
+        working-directory: src/KGV.Web
+      
+      - name: Run tests
+        run: npm run test:ci
+        working-directory: src/KGV.Web
+      
+      - name: Build application
+        run: npm run build
+        working-directory: src/KGV.Web
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
+      
+      - name: Run E2E tests
+        run: |
+          npx playwright install --with-deps
+          npm run test:e2e
+        working-directory: src/KGV.Web
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report
+          path: src/KGV.Web/playwright-report/
+
+  # Infrastructure Validation
+  terraform-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    needs: security-scan
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+      
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: infrastructure/terraform
+      
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: infrastructure/terraform
+      
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: infrastructure/terraform
+      
+      - name: TFLint
+        uses: terraform-linters/setup-tflint@v4
+      
+      - name: Run TFLint
+        run: tflint --recursive
+        working-directory: infrastructure/terraform
+      
+      - name: Checkov Security Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infrastructure/terraform
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov.sarif
+      
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+
+  # Docker Build
+  docker-build:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [backend-build, frontend-build]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    strategy:
+      matrix:
+        service: [api, web]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.REGISTRY_LOGIN_SERVER }}/kgv-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/KGV.${{ matrix.service == 'api' && 'Api' || 'Web' }}
+          file: ./src/KGV.${{ matrix.service == 'api' && 'Api' || 'Web' }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_VERSION=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+  # Database Migration Check
+  database-migration:
+    name: Database Migration Check
+    runs-on: ubuntu-latest
+    needs: security-scan
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      
+      - name: Validate SQL scripts
+        run: |
+          for file in postgresql/*.sql etl/*.sql migration/*.sql; do
+            echo "Validating $file"
+            pg_query_analyser < "$file" || true
+          done
+      
+      - name: Check for migration conflicts
+        run: |
+          # Check if migration files follow naming convention
+          ls -la migration/*.sql | grep -E '^[0-9]{3}_.*\.sql$'
+
+  # Deploy to Environment
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'staging' }}
+    runs-on: ubuntu-latest
+    needs: [docker-build, terraform-validate, database-migration]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: ${{ steps.deploy.outputs.app_url }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+      
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RG }}" \
+            -backend-config="storage_account_name=${{ secrets.TF_BACKEND_SA }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=kgv-${{ github.event.inputs.environment || 'staging' }}.tfstate"
+        working-directory: infrastructure/terraform
+      
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var="environment=${{ github.event.inputs.environment || 'staging' }}" \
+            -out=tfplan
+        working-directory: infrastructure/terraform
+      
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: |
+          terraform apply tfplan
+        working-directory: infrastructure/terraform
+      
+      - name: Run Database Migrations
+        run: |
+          # Get connection string from Key Vault
+          CONNECTION_STRING=$(az keyvault secret show \
+            --vault-name "kv-kgv-${{ github.event.inputs.environment || 'staging' }}" \
+            --name "db-connection-string-${{ github.event.inputs.environment || 'staging' }}" \
+            --query value -o tsv)
+          
+          # Run migrations
+          for file in migration/*.sql; do
+            echo "Running migration: $file"
+            psql "$CONNECTION_STRING" -f "$file"
+          done
+      
+      - name: Deploy Container Apps
+        run: |
+          # Deploy API
+          az containerapp update \
+            --name "ca-kgv-api-${{ github.event.inputs.environment || 'staging' }}" \
+            --resource-group "rg-kgv-${{ github.event.inputs.environment || 'staging' }}" \
+            --image "${{ secrets.REGISTRY_LOGIN_SERVER }}/kgv-api:${{ github.sha }}"
+          
+          # Deploy Web
+          az containerapp update \
+            --name "ca-kgv-web-${{ github.event.inputs.environment || 'staging' }}" \
+            --resource-group "rg-kgv-${{ github.event.inputs.environment || 'staging' }}" \
+            --image "${{ secrets.REGISTRY_LOGIN_SERVER }}/kgv-web:${{ github.sha }}"
+      
+      - name: Health Check
+        id: health
+        run: |
+          APP_URL="https://kgv-${{ github.event.inputs.environment || 'staging' }}.frankfurt.de"
+          echo "app_url=$APP_URL" >> $GITHUB_OUTPUT
+          
+          # Wait for deployment to be ready
+          sleep 30
+          
+          # Check API health
+          curl -f "$APP_URL/api/health" || exit 1
+          
+          # Check Web health
+          curl -f "$APP_URL" || exit 1
+      
+      - name: Run Smoke Tests
+        run: |
+          npm install -g newman
+          newman run tests/postman/smoke-tests.json \
+            --env-var "baseUrl=${{ steps.health.outputs.app_url }}"
+
+  # Post-deployment Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Run Integration Tests
+        run: |
+          npm install -g newman
+          newman run tests/postman/integration-tests.json \
+            --env-var "baseUrl=https://kgv-${{ github.event.inputs.environment || 'staging' }}.frankfurt.de" \
+            --reporters cli,junit \
+            --reporter-junit-export results.xml
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: results.xml
+
+  # Rollback on Failure
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy, integration-tests]
+    if: failure()
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Get Previous Revision
+        id: previous
+        run: |
+          PREVIOUS_REVISION=$(az containerapp revision list \
+            --name "ca-kgv-api-${{ github.event.inputs.environment || 'staging' }}" \
+            --resource-group "rg-kgv-${{ github.event.inputs.environment || 'staging' }}" \
+            --query "[1].name" -o tsv)
+          echo "revision=$PREVIOUS_REVISION" >> $GITHUB_OUTPUT
+      
+      - name: Rollback Container Apps
+        run: |
+          # Rollback API
+          az containerapp revision activate \
+            --name "ca-kgv-api-${{ github.event.inputs.environment || 'staging' }}" \
+            --resource-group "rg-kgv-${{ github.event.inputs.environment || 'staging' }}" \
+            --revision "${{ steps.previous.outputs.revision }}"
+          
+          # Rollback Web
+          az containerapp revision activate \
+            --name "ca-kgv-web-${{ github.event.inputs.environment || 'staging' }}" \
+            --resource-group "rg-kgv-${{ github.event.inputs.environment || 'staging' }}" \
+            --revision "${{ steps.previous.outputs.revision }}"
+      
+      - name: Notify Team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: 'Deployment rollback initiated for ${{ github.event.inputs.environment || "staging" }}'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # Notification
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy, integration-tests]
+    if: always()
+    
+    steps:
+      - name: Slack Notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Deployment to ${{ github.event.inputs.environment || 'staging' }} ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      
+      - name: Microsoft Teams Notification
+        uses: jdcargile/ms-teams-notification@v1.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ secrets.TEAMS_WEBHOOK }}
+          notification-summary: KGV Deployment ${{ job.status }}
+          notification-color: ${{ job.status == 'success' && '00FF00' || 'FF0000' }}

@@ -1,0 +1,69 @@
+# Terraform Variables Example File
+# Copy this file to terraform.tfvars and fill in your values
+
+# Environment Configuration
+environment = "dev" # Options: dev, staging, prod
+
+# Azure Region Configuration
+location           = "germanywestcentral" # Frankfurt
+location_secondary = "germanynorth"        # Berlin (for DR)
+
+# Resource Naming
+prefix = "kgv"
+
+# Database Configuration
+database_admin_login     = "kgvadmin"
+database_sku_name       = "GP_Gen5_2"  # Dev: GP_Gen5_2, Staging: GP_Gen5_4, Prod: GP_Gen5_8
+database_storage_gb     = 128          # Dev: 128, Staging: 128, Prod: 256
+database_backup_days    = 7            # Dev: 7, Staging: 7, Prod: 30
+database_geo_redundant  = false        # Dev: false, Staging: false, Prod: true
+database_high_availability = false     # Dev: false, Staging: false, Prod: true
+
+# Redis Configuration
+redis_sku_name = "C1" # Dev: C1, Staging: C2, Prod: P1
+
+# Container Apps Configuration
+container_cpu_request    = "0.5"  # Dev: 0.5, Staging: 1, Prod: 2
+container_memory_request = "1"    # Dev: 1, Staging: 2, Prod: 4
+container_min_replicas   = 1      # Dev: 1, Staging: 1, Prod: 2
+container_max_replicas   = 3      # Dev: 3, Staging: 3, Prod: 10
+
+# Application Gateway Configuration
+appgw_sku_name          = "Standard_v2"
+appgw_sku_tier          = "Standard_v2"
+appgw_sku_capacity      = 2
+appgw_enable_waf        = false  # Dev: false, Staging: false, Prod: true
+appgw_enable_autoscaling = false # Dev: false, Staging: false, Prod: true
+
+# Monitoring Configuration
+log_retention_days       = 30  # Dev: 30, Staging: 30, Prod: 90
+enable_diagnostics       = true
+enable_metrics          = true
+enable_distributed_tracing = true
+
+# Alert Configuration
+alert_email_address = "kgv-dev@frankfurt.de" # Change for each environment
+
+# Backup Configuration
+backup_enabled          = true
+daily_backup_retention  = 7   # Dev: 7, Staging: 7, Prod: 30
+weekly_backup_retention = 4   # Dev: 4, Staging: 4, Prod: 12
+monthly_backup_retention = 3  # Dev: 3, Staging: 3, Prod: 12
+
+# Security Configuration
+enable_private_endpoints = true
+enable_network_policies  = true
+enable_ddos_protection  = false # Dev: false, Staging: false, Prod: true
+
+# Cost Optimization
+enable_auto_shutdown    = true  # Dev: true, Staging: true, Prod: false
+auto_shutdown_time      = "1900" # 19:00 UTC
+enable_reserved_capacity = false # Dev: false, Staging: false, Prod: true
+
+# Tags (Additional to common tags)
+additional_tags = {
+  Owner       = "IT-Department"
+  CostCenter  = "CC-1234"
+  DataClass   = "Internal"
+  Criticality = "High"
+}
