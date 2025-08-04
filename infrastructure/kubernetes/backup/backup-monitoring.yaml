@@ -1,0 +1,234 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-monitoring
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: backup-monitoring
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  schedule: "0 6 * * *"  # Daily at 6 AM
+  timeZone: "Europe/Berlin"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: backup-monitoring
+            app.kubernetes.io/component: backup
+        spec:
+          serviceAccountName: kgv-backup
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: backup-monitoring
+            image: busybox:1.36-uclibc
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              echo "Starting backup monitoring at $(date)"
+              
+              BACKUP_DIR="/backups/postgres"
+              REPORT_FILE="/tmp/backup_report.txt"
+              ALERT_FILE="/tmp/backup_alerts.txt"
+              
+              # Initialize report
+              echo "KGV Backup Monitoring Report - $(date)" > $REPORT_FILE
+              echo "=================================================" >> $REPORT_FILE
+              echo "" >> $REPORT_FILE
+              
+              # Check if backup directory exists
+              if [ ! -d "$BACKUP_DIR" ]; then
+                echo "ERROR: Backup directory $BACKUP_DIR does not exist" >> $REPORT_FILE
+                echo "CRITICAL: Backup directory missing" > $ALERT_FILE
+                exit 1
+              fi
+              
+              # Check for recent backups (last 25 hours to account for time variations)
+              RECENT_BACKUPS=$(find $BACKUP_DIR -name "kgv_backup_*.sql*" -mtime -1 | wc -l)
+              echo "Recent backups (last 24 hours): $RECENT_BACKUPS" >> $REPORT_FILE
+              
+              if [ $RECENT_BACKUPS -eq 0 ]; then
+                echo "WARNING: No recent backups found" >> $REPORT_FILE
+                echo "WARNING: No recent backups found" > $ALERT_FILE
+              fi
+              
+              # Check backup sizes and integrity
+              echo "" >> $REPORT_FILE
+              echo "Backup File Status:" >> $REPORT_FILE
+              echo "-------------------" >> $REPORT_FILE
+              
+              for backup_file in $(find $BACKUP_DIR -name "kgv_backup_*.sql.custom" -mtime -7 | sort -r | head -7); do
+                if [ -f "$backup_file" ]; then
+                  BACKUP_SIZE=$(stat -c%s "$backup_file" 2>/dev/null || echo "0")
+                  BACKUP_DATE=$(stat -c%y "$backup_file" 2>/dev/null || echo "unknown")
+                  
+                  echo "File: $(basename $backup_file)" >> $REPORT_FILE
+                  echo "Size: $BACKUP_SIZE bytes ($(($BACKUP_SIZE / 1024 / 1024)) MB)" >> $REPORT_FILE
+                  echo "Date: $BACKUP_DATE" >> $REPORT_FILE
+                  
+                  # Check if backup is suspiciously small (less than 1MB might indicate an issue)
+                  if [ $BACKUP_SIZE -lt 1048576 ]; then
+                    echo "WARNING: Backup file $backup_file is unusually small ($BACKUP_SIZE bytes)" >> $REPORT_FILE
+                    echo "WARNING: Small backup file detected" >> $ALERT_FILE
+                  fi
+                  
+                  # Check if checksum file exists
+                  if [ -f "${backup_file}.sha256" ]; then
+                    echo "Checksum: Available" >> $REPORT_FILE
+                  else
+                    echo "Checksum: Missing" >> $REPORT_FILE
+                    echo "WARNING: Missing checksum for $backup_file" >> $ALERT_FILE
+                  fi
+                  
+                  echo "" >> $REPORT_FILE
+                fi
+              done
+              
+              # Check disk usage in backup directory
+              BACKUP_USAGE=$(du -sh $BACKUP_DIR 2>/dev/null | cut -f1)
+              echo "Total backup directory usage: $BACKUP_USAGE" >> $REPORT_FILE
+              
+              # Count total backup files
+              TOTAL_BACKUPS=$(find $BACKUP_DIR -name "kgv_backup_*.sql*" | wc -l)
+              echo "Total backup files: $TOTAL_BACKUPS" >> $REPORT_FILE
+              
+              # Check for old backups that should be cleaned up
+              OLD_BACKUPS=$(find $BACKUP_DIR -name "kgv_backup_*.sql*" -mtime +35 | wc -l)
+              if [ $OLD_BACKUPS -gt 0 ]; then
+                echo "Old backups to clean up: $OLD_BACKUPS" >> $REPORT_FILE
+              fi
+              
+              echo "" >> $REPORT_FILE
+              echo "Monitoring completed at $(date)" >> $REPORT_FILE
+              
+              # Print report
+              cat $REPORT_FILE
+              
+              # If there are alerts, send them (in a real environment, this would integrate with alerting systems)
+              if [ -f "$ALERT_FILE" ]; then
+                echo ""
+                echo "ALERTS DETECTED:"
+                echo "================"
+                cat $ALERT_FILE
+                
+                # In production, you would send these alerts to your monitoring system
+                # For example, posting to a webhook or sending to Prometheus Pushgateway
+                echo "Alerts would be sent to monitoring system in production environment"
+              fi
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+              readOnly: true
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 65534
+              runAsGroup: 65534
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgres-backup
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: backup-scripts
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+data:
+  restore-backup.sh: |
+    #!/bin/bash
+    # Script to restore PostgreSQL backup
+    # Usage: ./restore-backup.sh <backup-file-path> [restore-type]
+    
+    set -e
+    
+    BACKUP_FILE="$1"
+    RESTORE_TYPE="${2:-full}"
+    
+    if [ -z "$BACKUP_FILE" ]; then
+      echo "Usage: $0 <backup-file-path> [restore-type]"
+      echo "restore-type: full (default) or schema-only"
+      exit 1
+    fi
+    
+    echo "Creating PostgreSQL restore job..."
+    
+    # Create the restore job with the specified backup file
+    kubectl create job postgres-restore-$(date +%s) \
+      --from=job/postgres-restore \
+      --dry-run=client -o yaml | \
+      sed "s|/backups/postgres/backup_to_restore.sql.custom|$BACKUP_FILE|g" | \
+      sed "s|value: \"full\"|value: \"$RESTORE_TYPE\"|g" | \
+      kubectl apply -f -
+    
+    echo "Restore job created. Monitor with:"
+    echo "kubectl logs -f job/postgres-restore-$(date +%s) -n kgv-system"
+  
+  list-backups.sh: |
+    #!/bin/bash
+    # Script to list available backups
+    
+    echo "Available PostgreSQL backups:"
+    echo "=============================="
+    
+    kubectl exec -n kgv-system deployment/postgres -- \
+      find /backups/postgres -name "kgv_backup_*.sql*" -type f | \
+      sort -r | \
+      head -20
+    
+    echo ""
+    echo "Weekly backups:"
+    echo "==============="
+    
+    kubectl exec -n kgv-system deployment/postgres -- \
+      find /backups/postgres/weekly -name "kgv_weekly_backup_*.sql*" -type f | \
+      sort -r | \
+      head -10
+  
+  manual-backup.sh: |
+    #!/bin/bash
+    # Script to trigger manual backup
+    
+    echo "Creating manual PostgreSQL backup job..."
+    
+    kubectl create job postgres-manual-backup-$(date +%s) \
+      --from=cronjob/postgres-backup \
+      -n kgv-system
+    
+    echo "Manual backup job created. Monitor with:"
+    echo "kubectl logs -f job/postgres-manual-backup-$(date +%s) -n kgv-system"

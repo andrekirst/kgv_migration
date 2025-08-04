@@ -1,0 +1,78 @@
+# Redis ACL Configuration for KGV Migration
+# This file defines user permissions and access controls
+
+# Default user - DISABLED for security
+user default on nopass ~* &* +@all
+
+# Admin user - Full access (for maintenance only)
+# Password should be set via secrets management
+user admin on +@all ~* &* -flushdb -flushall -config -shutdown
+
+# Application user - Limited to application operations
+user kgv_app on ~kgv:* ~session:* ~cache:* &* \
+  +get +set +del +exists +expire +ttl +persist \
+  +mget +mset +incr +decr +incrby +decrby \
+  +hget +hset +hdel +hgetall +hmget +hmset +hexists +hlen \
+  +lpush +rpush +lpop +rpop +llen +lrange +ltrim \
+  +sadd +srem +smembers +sismember +scard \
+  +zadd +zrem +zrange +zrevrange +zrank +zrevrank +zscore +zcard \
+  +publish +subscribe +unsubscribe \
+  -flushdb -flushall -keys -config -shutdown -script -debug
+
+# Read-only user for monitoring and debugging
+user readonly on ~* &* \
+  +ping +info +client|list +client|getname \
+  +get +mget +exists +ttl +type \
+  +hget +hgetall +hexists \
+  +llen +lrange \
+  +smembers +sismember +scard \
+  +zrange +zrevrange +zrank +zrevrank +zscore +zcard \
+  -flushdb -flushall -keys -config -shutdown -script -debug
+
+# Session management user - Specific to session operations
+user session_manager on ~session:* &* \
+  +get +set +del +exists +expire +ttl \
+  +setex +setnx \
+  -flushdb -flushall -keys -config -shutdown -script -debug
+
+# Cache management user - Specific to cache operations
+user cache_manager on ~cache:* &* \
+  +get +set +del +exists +expire +ttl \
+  +setex +setnx +mget +mset \
+  -flushdb -flushall -keys -config -shutdown -script -debug
+
+# Monitoring user - For metrics collection
+user monitoring on ~* &* \
+  +ping +info +client|list \
+  +dbsize +lastsave \
+  +config|get \
+  -flushdb -flushall -keys -config|set -shutdown -script -debug
+
+# Backup user - For backup operations only
+user backup on ~* &* \
+  +bgsave +lastsave +info \
+  -flushdb -flushall -keys -config -shutdown -script -debug
+
+# Replication user (if using replication)
+# user replica on +ping +replconf +psync ~* &* \
+#   -flushdb -flushall -keys -config -shutdown -script -debug
+
+# Notes:
+# - Passwords for all users should be set via environment variables or secrets
+# - ACL rules format: user <username> on|off [passwords] [rules]
+# - Key patterns: ~<pattern> (e.g., ~kgv:* matches all keys starting with "kgv:")
+# - Pub/Sub patterns: &<pattern> (e.g., &* matches all channels)
+# - Commands: +<command> to allow, -<command> to deny
+# - Categories: +@<category> to allow all commands in a category
+#
+# Categories available:
+# @read, @write, @keyspace, @string, @list, @set, @sorted_set, @hash,
+# @pubsub, @transaction, @scripting, @connection, @server, @slow, @fast,
+# @blocking, @dangerous, @admin
+#
+# Security recommendations:
+# 1. Always use strong, unique passwords for each user
+# 2. Regularly rotate passwords
+# 3. Monitor access logs for suspicious activity
+# 4. Use TLS for all connections
+# 5. Implement IP whitelisting where possible

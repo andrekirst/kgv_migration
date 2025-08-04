@@ -12,17 +12,23 @@ resources:
   # Namespace
   - namespace.yaml
   
+  # Service Accounts and RBAC
+  - service-accounts.yaml
+  - rbac.yaml
+  
   # ConfigMaps and Secrets
   - configmap-app.yaml
+  - postgres-init-configmap.yaml
   - secret-app.yaml
   
-  # Database
+  # PostgreSQL Database
   - postgres-pvc.yaml
-  - postgres-deployment.yaml
+  - postgres-statefulset.yaml
   - postgres-service.yaml
   
-  # Redis
-  - redis-deployment.yaml
+  # Redis Cache
+  - redis-pvc.yaml
+  - redis-statefulset.yaml
   - redis-service.yaml
   
   # API Application
@@ -41,72 +47,21 @@ resources:
   # Network Policies
   - network-policies.yaml
   
-  # Service Accounts and RBAC
-  - service-accounts.yaml
-  - rbac.yaml
-  
   # Pod Disruption Budgets
   - pdb.yaml
 
-configMapGenerator:
-  - name: app-config
-    literals:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - LOG_LEVEL=Information
-      - ENABLE_METRICS=true
-      - ENABLE_TRACING=true
-    options:
-      disableNameSuffixHash: true
-
-secretGenerator:
-  - name: app-secrets
-    type: Opaque
-    literals:
-      - JWT_SECRET=replaceme
-      - DB_PASSWORD=replaceme
-      - REDIS_PASSWORD=replaceme
-    options:
-      disableNameSuffixHash: true
-
 images:
-  - name: kgv-api
-    newName: acrkgvprod.azurecr.io/kgv-api
+  - name: acrkgvprod.azurecr.io/kgv-api
     newTag: latest
-  - name: kgv-web
-    newName: acrkgvprod.azurecr.io/kgv-web
+  - name: acrkgvprod.azurecr.io/kgv-web
     newTag: latest
 
 replicas:
-  - name: api
+  - name: kgv-api
     count: 2
-  - name: web
+  - name: kgv-web
     count: 2
-
-patches:
-  - target:
-      kind: Deployment
-      name: kgv-api
-    patch: |-
-      - op: add
-        path: /spec/template/spec/containers/0/resources
-        value:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-  
-  - target:
-      kind: Deployment
-      name: kgv-web
-    patch: |-
-      - op: add
-        path: /spec/template/spec/containers/0/resources
-        value:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
+  - name: postgres
+    count: 1
+  - name: redis
+    count: 1

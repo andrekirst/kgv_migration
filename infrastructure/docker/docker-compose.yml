@@ -3,13 +3,13 @@ version: '3.9'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: kgv-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: kgv_development
       POSTGRES_USER: kgv_admin
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-DevPassword123!}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR: POSTGRES_PASSWORD not set in .env file}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.utf8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -29,7 +29,7 @@ services:
     image: redis:7-alpine
     container_name: kgv-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-RedisDevPass123!}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?ERROR: REDIS_PASSWORD not set in .env file}
     volumes:
       - redis_data:/data
     ports:
@@ -53,9 +53,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5000
-      ConnectionStrings__Database: "Host=postgres;Database=kgv_development;Username=kgv_admin;Password=${DB_PASSWORD:-DevPassword123!}"
-      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD:-RedisDevPass123!}"
-      JWT__Secret: ${JWT_SECRET:-DevJwtSecret123!DevJwtSecret123!}
+      ConnectionStrings__Database: "Host=postgres;Database=${POSTGRES_DB:-kgv_development};Username=${POSTGRES_USER:-kgv_admin};Password=${POSTGRES_PASSWORD:?ERROR: POSTGRES_PASSWORD not set}"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD:?ERROR: REDIS_PASSWORD not set}"
+      JWT__Secret: ${JWT_SECRET:?ERROR: JWT_SECRET not set in .env file}
       JWT__Issuer: "kgv-api-dev"
       JWT__Audience: "kgv-web-dev"
       Logging__LogLevel__Default: "Information"
@@ -64,8 +64,8 @@ services:
     volumes:
       - ../../src/KGV.Api:/app
       - api_logs:/app/logs
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,20 +89,45 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://api:5000
-      NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-DevNextAuthSecret123!}
+      NEXT_PUBLIC_API_URL: http://localhost/api  # Through nginx proxy
+      NEXTAUTH_URL: http://localhost
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?ERROR: NEXTAUTH_SECRET not set in .env file}
     volumes:
       - ../../src/KGV.Web:/app
       - /app/node_modules
       - /app/.next
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kgv-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: kgv-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -116,7 +141,7 @@ services:
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@kgv.local
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-PgAdminPass123!}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?ERROR: PGADMIN_PASSWORD not set in .env file}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     volumes:
       - pgadmin_data:/var/lib/pgadmin
@@ -163,7 +188,7 @@ services:
     restart: unless-stopped
     environment:
       ACCEPT_EULA: 'Y'
-      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_PASSWORD:-SeqAdminPass123!}
+      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_ADMIN_PASSWORD:?ERROR: SEQ_ADMIN_PASSWORD not set in .env file}
     volumes:
       - seq_data:/data
     ports:
@@ -201,7 +226,7 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-GrafanaPass123!}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?ERROR: GRAFANA_ADMIN_PASSWORD not set in .env file}
       GF_INSTALL_PLUGINS: grafana-piechart-panel
     volumes:
       - grafana_data:/var/lib/grafana
@@ -272,6 +297,8 @@ volumes:
     name: kgv-redis-data
   api_logs:
     name: kgv-api-logs
+  nginx_logs:
+    name: kgv-nginx-logs
   pgadmin_data:
     name: kgv-pgadmin-data
   seq_data:

@@ -1,0 +1,419 @@
+# Docker Compose Security Hardening Override
+# Use: docker-compose -f docker-compose.yml -f docker-compose.secure.yml up
+# This file implements critical security fixes identified in the audit
+
+version: '3.9'
+
+# Define Docker secrets (must be created externally)
+secrets:
+  postgres_password:
+    external: true
+    name: kgv_postgres_password
+  postgres_app_password:
+    external: true
+    name: kgv_postgres_app_password
+  redis_password:
+    external: true
+    name: kgv_redis_password
+  jwt_secret:
+    external: true
+    name: kgv_jwt_secret
+  nextauth_secret:
+    external: true
+    name: kgv_nextauth_secret
+  data_encryption_key:
+    external: true
+    name: kgv_data_encryption_key
+
+# Network segmentation
+networks:
+  kgv-frontend:
+    driver: bridge
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.28.1.0/24
+    driver_opts:
+      com.docker.network.bridge.name: kgv-front
+      com.docker.network.bridge.enable_icc: "false"
+      
+  kgv-backend:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.2.0/24
+    driver_opts:
+      com.docker.network.bridge.name: kgv-back
+      com.docker.network.bridge.enable_icc: "false"
+      
+  kgv-database:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.3.0/24
+    driver_opts:
+      com.docker.network.bridge.name: kgv-db
+      com.docker.network.bridge.enable_icc: "false"
+
+services:
+  # PostgreSQL with security hardening
+  postgres:
+    image: postgres:16-alpine
+    secrets:
+      - postgres_password
+      - postgres_app_password
+    environment:
+      POSTGRES_DB: kgv_production
+      POSTGRES_USER: kgv_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: >
+        --encoding=UTF8 
+        --locale=de_DE.utf8 
+        --auth-host=scram-sha-256 
+        --auth-local=scram-sha-256
+        --data-checksums
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    command: >
+      postgres
+      -c ssl=on
+      -c ssl_cert_file=/var/lib/postgresql/certs/server.crt
+      -c ssl_key_file=/var/lib/postgresql/certs/server.key
+      -c ssl_ca_file=/var/lib/postgresql/certs/ca.crt
+      -c ssl_ciphers='HIGH:MEDIUM:+3DES:!aNULL'
+      -c ssl_prefer_server_ciphers=on
+      -c shared_preload_libraries='pg_stat_statements,pgaudit'
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_statement='all'
+      -c log_duration=on
+      -c log_min_duration_statement=100
+      -c max_connections=100
+      -c superuser_reserved_connections=3
+      -c password_encryption='scram-sha-256'
+    volumes:
+      - postgres_data_encrypted:/var/lib/postgresql/data
+      - ./certs/postgres:/var/lib/postgresql/certs:ro
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+      - type: tmpfs
+        target: /tmp
+    # Remove public port exposure
+    expose:
+      - "5432"
+    networks:
+      - kgv-database
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:default
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    user: "999:999"
+    read_only: false
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kgv_admin -d kgv_production && psql -U kgv_admin -d kgv_production -c 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis with security hardening
+  redis:
+    image: redis:7-alpine
+    secrets:
+      - redis_password
+    command: >
+      redis-server
+      /usr/local/etc/redis/redis-secure.conf
+      --requirepass_file /run/secrets/redis_password
+      --tls-port 6379
+      --port 0
+      --tls-cert-file /tls/redis.crt
+      --tls-key-file /tls/redis.key
+      --tls-ca-cert-file /tls/ca.crt
+      --tls-dh-params-file /tls/redis.dh
+      --tls-auth-clients yes
+    volumes:
+      - redis_data_encrypted:/data
+      - ./redis/redis-secure.conf:/usr/local/etc/redis/redis-secure.conf:ro
+      - ./redis/users.acl:/usr/local/etc/redis/users.acl:ro
+      - ./certs/redis:/tls:ro
+      - type: tmpfs
+        target: /tmp
+    expose:
+      - "6379"
+    networks:
+      - kgv-backend
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    user: "999:999"
+    read_only: false
+
+  # .NET API with security hardening
+  api:
+    build:
+      context: ../../src/KGV.Api
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    secrets:
+      - postgres_app_password
+      - redis_password
+      - jwt_secret
+      - data_encryption_key
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: https://+:5000
+      ASPNETCORE_HTTPS_PORT: 5000
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /certs/api.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password_FILE: /run/secrets/cert_password
+      ConnectionStrings__Database_FILE: /run/secrets/database_connection
+      ConnectionStrings__Redis_FILE: /run/secrets/redis_connection
+      JWT__Secret_FILE: /run/secrets/jwt_secret
+      DataProtection__KeyPath: /keys
+      DataProtection__CertPath: /certs/data-protection.pfx
+      Logging__LogLevel__Default: Warning
+      Logging__LogLevel__Microsoft: Warning
+      Logging__LogLevel__Microsoft.Hosting.Lifetime: Information
+      Security__EnableAuditLogging: "true"
+      Security__EnableRateLimiting: "true"
+      Security__EnableRequestValidation: "true"
+      Security__RequireHttps: "true"
+    volumes:
+      - api_logs_encrypted:/app/logs
+      - api_keys:/keys
+      - ./certs/api:/certs:ro
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 100M
+    expose:
+      - "5000"
+    networks:
+      - kgv-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+      - seccomp:default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    user: "1001:1001"
+    read_only: true
+
+  # Next.js with security hardening
+  web:
+    build:
+      context: ../../src/KGV.Web
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    secrets:
+      - nextauth_secret
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://api:5000
+      NEXTAUTH_URL: https://kgv.example.com
+      NEXTAUTH_SECRET_FILE: /run/secrets/nextauth_secret
+      NEXT_TELEMETRY_DISABLED: 1
+    volumes:
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 100M
+      - type: tmpfs
+        target: /app/.next/cache
+        tmpfs:
+          size: 200M
+    expose:
+      - "3000"
+    networks:
+      - kgv-backend
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+      - seccomp:default
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    user: "1001:1001"
+    read_only: true
+
+  # Nginx with maximum security
+  nginx:
+    image: nginx:1.25-alpine
+    volumes:
+      - ./nginx/nginx-secure.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/secure.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/security-headers-strict.conf:/etc/nginx/security-headers.conf:ro
+      - ./certs/nginx:/etc/nginx/ssl:ro
+      - nginx_logs_encrypted:/var/log/nginx
+      - type: tmpfs
+        target: /var/cache/nginx
+        tmpfs:
+          size: 100M
+      - type: tmpfs
+        target: /var/run
+        tmpfs:
+          size: 10M
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 10M
+    ports:
+      - "443:443"
+    networks:
+      - kgv-frontend
+      - kgv-backend
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    read_only: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "--insecure", "https://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Security monitoring with Falco
+  falco:
+    image: falcosecurity/falco:latest
+    container_name: kgv-falco
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /dev:/host/dev
+      - /proc:/host/proc:ro
+      - /boot:/host/boot:ro
+      - /lib/modules:/host/lib/modules:ro
+      - /usr:/host/usr:ro
+      - /etc:/host/etc:ro
+      - ./falco/falco.yaml:/etc/falco/falco.yaml:ro
+      - ./falco/rules.d:/etc/falco/rules.d:ro
+      - falco_logs:/var/log/falco
+    networks:
+      - kgv-backend
+    profiles:
+      - security
+
+  # ClamAV for malware scanning
+  clamav:
+    image: clamav/clamav:stable
+    container_name: kgv-clamav
+    volumes:
+      - clamav_data:/var/lib/clamav
+      - ./uploads:/scan:ro
+      - type: tmpfs
+        target: /tmp
+    networks:
+      - kgv-backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    profiles:
+      - security
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # Auditbeat for audit logging
+  auditbeat:
+    image: docker.elastic.co/beats/auditbeat:8.11.0
+    container_name: kgv-auditbeat
+    user: root
+    cap_add:
+      - AUDIT_CONTROL
+      - AUDIT_READ
+    volumes:
+      - ./auditbeat/auditbeat.yml:/usr/share/auditbeat/auditbeat.yml:ro
+      - /var/log:/var/log:ro
+      - auditbeat_data:/usr/share/auditbeat/data
+    command: auditbeat -e -strict.perms=false
+    networks:
+      - kgv-backend
+    profiles:
+      - security
+
+# Encrypted volumes with restricted permissions
+volumes:
+  postgres_data_encrypted:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind,uid=999,gid=999"
+      device: "./data/postgres"
+      
+  redis_data_encrypted:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind,uid=999,gid=999"
+      device: "./data/redis"
+      
+  api_logs_encrypted:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind,uid=1001,gid=1001"
+      device: "./logs/api"
+      
+  nginx_logs_encrypted:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind,uid=101,gid=101"
+      device: "./logs/nginx"
+      
+  api_keys:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind,uid=1001,gid=1001"
+      device: "./keys"
+      
+  falco_logs:
+    driver: local
+    
+  clamav_data:
+    driver: local
+    
+  auditbeat_data:
+    driver: local

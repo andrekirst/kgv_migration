@@ -1,0 +1,81 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namePrefix: staging-
+namespace: kgv-staging
+
+resources:
+- ../../base
+
+commonLabels:
+  environment: staging
+  app.kubernetes.io/instance: kgv-staging
+
+images:
+- name: acrkgvprod.azurecr.io/kgv-api
+  newTag: staging-latest
+- name: acrkgvprod.azurecr.io/kgv-web
+  newTag: staging-latest
+
+replicas:
+- name: kgv-api
+  count: 2
+- name: kgv-web
+  count: 2
+- name: postgres
+  count: 1
+- name: redis
+  count: 1
+
+configMapGenerator:
+- name: app-config
+  behavior: merge
+  literals:
+  - ASPNETCORE_ENVIRONMENT=Staging
+  - NODE_ENV=production
+  - LOG_LEVEL=Information
+  - ENABLE_SWAGGER=false
+  - ENABLE_DETAILED_ERRORS=false
+  options:
+    disableNameSuffixHash: true
+
+patchesStrategicMerge:
+- patches/namespace.yaml
+- patches/ingress.yaml
+- patches/resources.yaml
+
+patches:
+- target:
+    kind: HorizontalPodAutoscaler
+    name: kgv-api-hpa
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 2
+    - op: replace
+      path: /spec/maxReplicas
+      value: 8
+- target:
+    kind: HorizontalPodAutoscaler
+    name: kgv-web-hpa
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 2
+    - op: replace
+      path: /spec/maxReplicas
+      value: 6
+- target:
+    kind: PersistentVolumeClaim
+    name: postgres-data
+  patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: 50Gi
+- target:
+    kind: PersistentVolumeClaim
+    name: redis-data
+  patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: 10Gi

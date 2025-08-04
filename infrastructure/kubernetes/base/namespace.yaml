@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kgv-system
+  labels:
+    name: kgv-system
+    app.kubernetes.io/name: kgv-migration
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+    environment: production
+  annotations:
+    meta.helm.sh/release-name: kgv-migration
+    meta.helm.sh/release-namespace: kgv-system
+spec:
+  finalizers:
+  - kubernetes
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kgv-monitoring
+  labels:
+    name: kgv-monitoring
+    app.kubernetes.io/name: kgv-monitoring
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+    environment: production
+  annotations:
+    meta.helm.sh/release-name: kgv-monitoring
+    meta.helm.sh/release-namespace: kgv-monitoring
+spec:
+  finalizers:
+  - kubernetes

@@ -1,0 +1,174 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: app-config
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+data:
+  # Application Environment
+  ASPNETCORE_ENVIRONMENT: "Production"
+  NODE_ENV: "production"
+  
+  # Logging Configuration
+  LOG_LEVEL: "Information"
+  ASPNETCORE_LOG_LEVEL: "Warning"
+  MICROSOFT_LOG_LEVEL: "Warning"
+  
+  # Feature Flags
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+  ENABLE_SWAGGER: "false"
+  ENABLE_DETAILED_ERRORS: "false"
+  
+  # JWT Configuration
+  JWT_ISSUER: "kgv-api"
+  JWT_AUDIENCE: "kgv-web"
+  JWT_EXPIRY_MINUTES: "60"
+  
+  # OpenTelemetry Configuration
+  OTEL_SERVICE_NAME: "kgv-api"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.kgv-monitoring.svc.cluster.local:4317"
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=kgv-api,service.version=1.0.0"
+  
+  # Database Configuration
+  DB_MAX_POOL_SIZE: "100"
+  DB_CONNECTION_TIMEOUT: "30"
+  DB_COMMAND_TIMEOUT: "300"
+  
+  # Redis Configuration
+  REDIS_CONNECTION_TIMEOUT: "5000"
+  REDIS_SYNC_TIMEOUT: "5000"
+  REDIS_ASYNC_TIMEOUT: "5000"
+  
+  # Application Configuration
+  MAX_REQUEST_SIZE: "10485760"  # 10MB
+  REQUEST_TIMEOUT: "00:05:00"   # 5 minutes
+  
+  # Health Check Configuration
+  HEALTH_CHECK_TIMEOUT: "00:00:30"
+  
+  # Localization
+  DEFAULT_CULTURE: "de-DE"
+  SUPPORTED_CULTURES: "de-DE,en-US"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: postgres-config
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+data:
+  POSTGRES_DB: "kgv_production"
+  POSTGRES_USER: "kgv_admin"
+  POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.utf8"
+  # PostgreSQL Configuration
+  postgresql.conf: |
+    # Connection Settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+    superuser_reserved_connections = 3
+    
+    # Memory Settings
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    work_mem = 4MB
+    maintenance_work_mem = 64MB
+    
+    # Checkpoint Settings
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    
+    # Logging Settings
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_rotation_age = 1d
+    log_rotation_size = 100MB
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    
+    # Performance Settings
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    
+    # WAL Settings
+    wal_level = replica
+    max_wal_senders = 3
+    hot_standby = on
+    
+    # German locale settings
+    lc_messages = 'de_DE.UTF-8'
+    lc_monetary = 'de_DE.UTF-8'
+    lc_numeric = 'de_DE.UTF-8'
+    lc_time = 'de_DE.UTF-8'
+    default_text_search_config = 'pg_catalog.german'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: redis-config
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+data:
+  redis.conf: |
+    # Network Configuration
+    bind 0.0.0.0
+    port 6379
+    timeout 300
+    tcp-keepalive 60
+    tcp-backlog 511
+    
+    # General Configuration
+    daemonize no
+    supervised no
+    loglevel notice
+    databases 16
+    
+    # Memory Management
+    maxmemory 512mb
+    maxmemory-policy allkeys-lru
+    
+    # Persistence Configuration
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+    
+    # AOF Configuration
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    
+    # Security
+    requirepass REDIS_PASSWORD_PLACEHOLDER
+    
+    # Performance
+    hz 10
+    dynamic-hz yes
+    
+    # Clients
+    maxclients 10000
