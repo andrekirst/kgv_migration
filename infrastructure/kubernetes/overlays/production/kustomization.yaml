@@ -1,0 +1,86 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kgv-system
+
+resources:
+- ../../base
+
+commonLabels:
+  environment: production
+  app.kubernetes.io/instance: kgv-production
+
+images:
+- name: acrkgvprod.azurecr.io/kgv-api
+  newTag: v1.0.0
+- name: acrkgvprod.azurecr.io/kgv-web
+  newTag: v1.0.0
+
+replicas:
+- name: kgv-api
+  count: 3
+- name: kgv-web
+  count: 3
+- name: postgres
+  count: 1
+- name: redis
+  count: 1
+
+configMapGenerator:
+- name: app-config
+  behavior: merge
+  literals:
+  - ASPNETCORE_ENVIRONMENT=Production
+  - NODE_ENV=production
+  - LOG_LEVEL=Warning
+  - ENABLE_SWAGGER=false
+  - ENABLE_DETAILED_ERRORS=false
+  options:
+    disableNameSuffixHash: true
+
+patchesStrategicMerge:
+- patches/resources.yaml
+- patches/database-production.yaml
+
+patches:
+- target:
+    kind: HorizontalPodAutoscaler
+    name: kgv-api-hpa
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 3
+    - op: replace
+      path: /spec/maxReplicas
+      value: 20
+- target:
+    kind: HorizontalPodAutoscaler
+    name: kgv-web-hpa
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 3
+    - op: replace
+      path: /spec/maxReplicas
+      value: 15
+- target:
+    kind: PersistentVolumeClaim
+    name: postgres-data
+  patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: 200Gi
+- target:
+    kind: PersistentVolumeClaim
+    name: postgres-backup
+  patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: 500Gi
+- target:
+    kind: PersistentVolumeClaim
+    name: redis-data
+  patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: 50Gi

@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kgv-system
+
+commonLabels:
+  app.kubernetes.io/part-of: kgv-migration
+  app.kubernetes.io/managed-by: kustomize
+
+resources:
+  # Backup CronJobs
+  - postgres-backup-cronjob.yaml
+  
+  # Restore Job Template
+  - postgres-restore-job.yaml
+  
+  # Backup Monitoring
+  - backup-monitoring.yaml

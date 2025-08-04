@@ -1,0 +1,71 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kgv-api-pdb
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: kgv-api-pdb
+    app.kubernetes.io/component: availability
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/target: kgv-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kgv-api
+      app.kubernetes.io/component: backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kgv-web-pdb
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: kgv-web-pdb
+    app.kubernetes.io/component: availability
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/target: kgv-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kgv-web
+      app.kubernetes.io/component: frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: postgres-pdb
+    app.kubernetes.io/component: availability
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/target: postgres
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/component: database
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-pdb
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: redis-pdb
+    app.kubernetes.io/component: availability
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/target: redis
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: cache

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kgv-api
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+            ephemeral-storage: "500Mi"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+            ephemeral-storage: "1Gi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kgv-web
+spec:
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+            ephemeral-storage: "250Mi"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+            ephemeral-storage: "500Mi"

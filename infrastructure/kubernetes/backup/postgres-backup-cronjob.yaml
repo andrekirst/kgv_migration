@@ -1,0 +1,273 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  timeZone: "Europe/Berlin"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400  # 24 hours
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgres-backup
+            app.kubernetes.io/component: backup
+        spec:
+          serviceAccountName: kgv-backup
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: postgres-backup
+            image: postgres:16-alpine
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Set timestamp
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR="/backups/postgres"
+              BACKUP_FILE="$BACKUP_DIR/kgv_backup_$TIMESTAMP.sql"
+              
+              # Create backup directory
+              mkdir -p $BACKUP_DIR
+              
+              # Create database backup
+              echo "Starting PostgreSQL backup at $(date)"
+              pg_dump -h postgres.kgv-system.svc.cluster.local \
+                      -U $POSTGRES_USER \
+                      -d $POSTGRES_DB \
+                      --verbose \
+                      --no-password \
+                      --clean \
+                      --create \
+                      --if-exists \
+                      --format=custom \
+                      --compress=9 \
+                      --file=$BACKUP_FILE.custom
+              
+              # Also create SQL dump for easy inspection
+              pg_dump -h postgres.kgv-system.svc.cluster.local \
+                      -U $POSTGRES_USER \
+                      -d $POSTGRES_DB \
+                      --verbose \
+                      --no-password \
+                      --clean \
+                      --create \
+                      --if-exists \
+                      --file=$BACKUP_FILE
+              
+              # Compress SQL dump
+              gzip $BACKUP_FILE
+              
+              # Create checksums
+              cd $BACKUP_DIR
+              sha256sum "kgv_backup_$TIMESTAMP.sql.custom" > "kgv_backup_$TIMESTAMP.sql.custom.sha256"
+              sha256sum "kgv_backup_$TIMESTAMP.sql.gz" > "kgv_backup_$TIMESTAMP.sql.gz.sha256"
+              
+              # Remove backups older than 30 days
+              find $BACKUP_DIR -name "kgv_backup_*.sql*" -mtime +30 -delete
+              
+              # Log backup completion
+              echo "PostgreSQL backup completed successfully at $(date)"
+              echo "Backup files:"
+              ls -la $BACKUP_DIR/kgv_backup_$TIMESTAMP.*
+              
+              # Verify backup integrity
+              echo "Verifying backup integrity..."
+              cd $BACKUP_DIR
+              sha256sum -c "kgv_backup_$TIMESTAMP.sql.custom.sha256"
+              sha256sum -c "kgv_backup_$TIMESTAMP.sql.gz.sha256"
+              echo "Backup verification completed successfully"
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: BACKUP_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: BACKUP_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 999
+              runAsGroup: 999
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgres-backup
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup-weekly
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: postgres-backup-weekly
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM
+  timeZone: "Europe/Berlin"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 2
+  successfulJobsHistoryLimit: 2
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgres-backup-weekly
+            app.kubernetes.io/component: backup
+        spec:
+          serviceAccountName: kgv-backup
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: postgres-backup-weekly
+            image: postgres:16-alpine
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Set timestamp
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR="/backups/postgres/weekly"
+              BACKUP_FILE="$BACKUP_DIR/kgv_weekly_backup_$TIMESTAMP.sql"
+              
+              # Create backup directory
+              mkdir -p $BACKUP_DIR
+              
+              # Create database backup with full schema
+              echo "Starting PostgreSQL weekly backup at $(date)"
+              pg_dump -h postgres.kgv-system.svc.cluster.local \
+                      -U $POSTGRES_USER \
+                      -d $POSTGRES_DB \
+                      --verbose \
+                      --no-password \
+                      --clean \
+                      --create \
+                      --if-exists \
+                      --format=custom \
+                      --compress=9 \
+                      --file=$BACKUP_FILE.custom
+              
+              # Create schema-only backup for structure analysis
+              pg_dump -h postgres.kgv-system.svc.cluster.local \
+                      -U $POSTGRES_USER \
+                      -d $POSTGRES_DB \
+                      --verbose \
+                      --no-password \
+                      --schema-only \
+                      --clean \
+                      --create \
+                      --if-exists \
+                      --file=$BACKUP_FILE.schema
+              
+              # Compress schema dump
+              gzip $BACKUP_FILE.schema
+              
+              # Create checksums
+              cd $BACKUP_DIR
+              sha256sum "kgv_weekly_backup_$TIMESTAMP.sql.custom" > "kgv_weekly_backup_$TIMESTAMP.sql.custom.sha256"
+              sha256sum "kgv_weekly_backup_$TIMESTAMP.sql.schema.gz" > "kgv_weekly_backup_$TIMESTAMP.sql.schema.gz.sha256"
+              
+              # Remove weekly backups older than 90 days
+              find $BACKUP_DIR -name "kgv_weekly_backup_*.sql*" -mtime +90 -delete
+              
+              echo "PostgreSQL weekly backup completed successfully at $(date)"
+              ls -la $BACKUP_DIR/kgv_weekly_backup_$TIMESTAMP.*
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: BACKUP_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: BACKUP_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 999
+              runAsGroup: 999
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgres-backup

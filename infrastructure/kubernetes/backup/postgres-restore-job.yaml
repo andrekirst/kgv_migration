@@ -1,0 +1,162 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-restore
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: postgres-restore
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400  # 24 hours
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-restore
+        app.kubernetes.io/component: backup
+    spec:
+      serviceAccountName: kgv-backup
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: postgres-restore
+        image: postgres:16-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          # Environment variables that need to be set when creating the job
+          # BACKUP_FILE_PATH - Path to the backup file to restore
+          # RESTORE_TYPE - "full" or "schema-only"
+          
+          if [ -z "$BACKUP_FILE_PATH" ]; then
+            echo "ERROR: BACKUP_FILE_PATH environment variable is required"
+            exit 1
+          fi
+          
+          if [ ! -f "$BACKUP_FILE_PATH" ]; then
+            echo "ERROR: Backup file $BACKUP_FILE_PATH not found"
+            exit 1
+          fi
+          
+          echo "Starting PostgreSQL restore at $(date)"
+          echo "Backup file: $BACKUP_FILE_PATH"
+          echo "Restore type: ${RESTORE_TYPE:-full}"
+          
+          # Check if backup file has checksum
+          if [ -f "$BACKUP_FILE_PATH.sha256" ]; then
+            echo "Verifying backup file integrity..."
+            cd $(dirname "$BACKUP_FILE_PATH")
+            sha256sum -c $(basename "$BACKUP_FILE_PATH.sha256")
+            echo "Backup file integrity verified"
+          fi
+          
+          # Determine file type and restore accordingly
+          if [[ "$BACKUP_FILE_PATH" == *.custom ]]; then
+            # Custom format backup
+            echo "Restoring from custom format backup..."
+            if [ "$RESTORE_TYPE" = "schema-only" ]; then
+              pg_restore -h postgres.kgv-system.svc.cluster.local \
+                         -U $POSTGRES_USER \
+                         -d $POSTGRES_DB \
+                         --verbose \
+                         --no-password \
+                         --clean \
+                         --if-exists \
+                         --schema-only \
+                         "$BACKUP_FILE_PATH"
+            else
+              pg_restore -h postgres.kgv-system.svc.cluster.local \
+                         -U $POSTGRES_USER \
+                         -d $POSTGRES_DB \
+                         --verbose \
+                         --no-password \
+                         --clean \
+                         --if-exists \
+                         "$BACKUP_FILE_PATH"
+            fi
+          elif [[ "$BACKUP_FILE_PATH" == *.sql.gz ]]; then
+            # Compressed SQL backup
+            echo "Restoring from compressed SQL backup..."
+            gunzip -c "$BACKUP_FILE_PATH" | psql -h postgres.kgv-system.svc.cluster.local \
+                                                  -U $POSTGRES_USER \
+                                                  -d $POSTGRES_DB \
+                                                  --quiet
+          elif [[ "$BACKUP_FILE_PATH" == *.sql ]]; then
+            # Plain SQL backup
+            echo "Restoring from SQL backup..."
+            psql -h postgres.kgv-system.svc.cluster.local \
+                 -U $POSTGRES_USER \
+                 -d $POSTGRES_DB \
+                 --quiet \
+                 -f "$BACKUP_FILE_PATH"
+          else
+            echo "ERROR: Unsupported backup file format"
+            exit 1
+          fi
+          
+          echo "PostgreSQL restore completed successfully at $(date)"
+          
+          # Run basic verification
+          echo "Running post-restore verification..."
+          psql -h postgres.kgv-system.svc.cluster.local \
+               -U $POSTGRES_USER \
+               -d $POSTGRES_DB \
+               -c "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema = 'public';"
+          
+          echo "Restore verification completed"
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: postgres-config
+              key: POSTGRES_USER
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: postgres-config
+              key: POSTGRES_DB
+        - name: BACKUP_FILE_PATH
+          value: "/backups/postgres/backup_to_restore.sql.custom"  # Set this when creating the job
+        - name: RESTORE_TYPE
+          value: "full"  # or "schema-only"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: backup-storage
+          mountPath: /backups
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: postgres-backup

@@ -1,0 +1,289 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-api
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-web-to-api
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kgv-api
+      app.kubernetes.io/component: backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kgv-web
+          app.kubernetes.io/component: frontend
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-web
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-ingress-to-web
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kgv-web
+      app.kubernetes.io/component: frontend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-database
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-api-to-database
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/component: database
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kgv-api
+          app.kubernetes.io/component: backend
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-redis
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-api-to-redis
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: cache
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kgv-api
+          app.kubernetes.io/component: backend
+    ports:
+    - protocol: TCP
+      port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scraping
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-monitoring-scraping
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchExpressions:
+    - key: prometheus.io/scrape
+      operator: In
+      values: ["true"]
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kgv-monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 5001  # API metrics
+    - protocol: TCP
+      port: 3000  # Web metrics
+    - protocol: TCP
+      port: 9187  # Postgres metrics
+    - protocol: TCP
+      port: 9121  # Redis metrics
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backup-access
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-backup-access
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/component: database
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: backup
+          app.kubernetes.io/component: backup
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-dns-egress
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-egress
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-external-egress
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kgv-api
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kgv-monitoring
+    ports:
+    - protocol: TCP
+      port: 4317  # OTEL Collector
+    - protocol: TCP
+      port: 4318  # OTEL Collector HTTP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-external-egress
+  namespace: kgv-system
+  labels:
+    app.kubernetes.io/name: allow-web-external-egress
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: kgv-migration
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kgv-web
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kgv-api
+    ports:
+    - protocol: TCP
+      port: 5000
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kgv-monitoring
+    ports:
+    - protocol: TCP
+      port: 4317  # OTEL Collector
+    - protocol: TCP
+      port: 4318  # OTEL Collector HTTP
