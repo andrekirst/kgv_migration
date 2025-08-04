@@ -729,3 +729,89 @@ The sub-agent system is working effectively when:
 5. **Learn from Agents**: Incorporate their recommendations into future work
 
 This automated sub-agent system ensures consistent, high-quality outcomes across all aspects of the KGV migration project.
+
+---
+
+# 🚨 MANDATORY Git Flow Workflow
+
+## ⚠️ CRITICAL RULE: Branch Creation BEFORE Development
+
+**BEFORE starting ANY development work, you MUST:**
+
+### 1. Create Feature Branch from GitHub Issue (MANDATORY)
+```bash
+# Option 1: Create branch from issue number
+claude issue start 4
+# → Creates: feature/ISSUE-4-container-infrastructure-docker-kubernetes
+
+# Option 2: Create branch from issue URL  
+claude issue start https://github.com/andrekirst/kgv_migration/issues/4
+
+# Option 3: Manual branch creation (if claude commands not available)
+git checkout develop
+git pull origin develop  
+git checkout -b feature/ISSUE-4-container-infrastructure-docker-kubernetes
+git push -u origin feature/ISSUE-4-container-infrastructure-docker-kubernetes
+```
+
+### 2. Link Branch to Issue on GitHub
+- Branch wird automatisch mit Issue verknüpft
+- Issue Status wird auf "In Progress" gesetzt
+- GitHub Tracking wird aktiviert
+
+### 3. Local Development Setup
+```bash
+# Verify correct branch
+git branch --show-current
+# Should show: feature/ISSUE-4-container-infrastructure-docker-kubernetes
+
+# Ensure clean working directory
+git status
+# Should show: nothing to commit, working tree clean
+```
+
+## 🔒 WORKFLOW ENFORCEMENT
+
+### NEVER Start Development Without:
+- ✅ **Feature Branch Created**: from GitHub Issue
+- ✅ **Branch Checked Out Locally**: correct branch active
+- ✅ **Issue Linked**: GitHub Issue shows "In Progress"
+- ✅ **Clean Working Directory**: no uncommitted changes
+
+### Development Process:
+1. **Create Feature Branch** (MANDATORY)
+2. **Make Commits** with conventional commit messages
+3. **Push Regularly** to remote branch
+4. **Create Pull Request** when feature complete
+5. **Code Review** and merge to develop
+6. **Branch Cleanup** after merge
+
+### Commit Message Format:
+```bash
+git commit -m "feat(docker): implement docker-compose infrastructure
+
+- Add development docker-compose.yml with all services
+- Configure postgres, redis, nginx reverse proxy  
+- Add health checks and proper networking
+- Support hot reload for local development
+
+Closes #4"
+```
+
+## 📋 Pre-Development Checklist
+
+Before ANY coding work:
+- [ ] GitHub Issue exists and is assigned
+- [ ] Feature branch created from issue
+- [ ] Local branch checked out
+- [ ] Working directory is clean
+- [ ] Issue status updated to "In Progress"
+
+**FAILURE TO FOLLOW THIS WORKFLOW WILL RESULT IN:**
+- ❌ Merge conflicts
+- ❌ Git history problems  
+- ❌ Lost work
+- ❌ CI/CD pipeline failures
+- ❌ Team collaboration issues
+
+This workflow is **NON-NEGOTIABLE** and must be followed for every development task.
