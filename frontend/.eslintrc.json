@@ -1,0 +1,81 @@
+{
+  "extends": [
+    "next/core-web-vitals",
+    "@typescript-eslint/recommended",
+    "plugin:accessibility/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint",
+    "accessibility"
+  ],
+  "rules": {
+    // TypeScript specific rules
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    "@typescript-eslint/prefer-const": "error",
+    "@typescript-eslint/no-var-requires": "error",
+    
+    // React specific rules
+    "react/jsx-curly-brace-presence": ["error", { "props": "never", "children": "never" }],
+    "react/self-closing-comp": ["error", { "component": true, "html": true }],
+    "react/jsx-sort-props": ["error", { "callbacksLast": true, "shorthandFirst": true }],
+    
+    // General rules
+    "prefer-const": "error",
+    "no-var": "error",
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-debugger": "error",
+    "no-duplicate-imports": "error",
+    "no-unused-expressions": "error",
+    
+    // Accessibility rules
+    "accessibility/alt-text": "error",
+    "accessibility/anchor-has-content": "error",
+    "accessibility/aria-props": "error",
+    "accessibility/aria-proptypes": "error",
+    "accessibility/aria-unsupported-elements": "error",
+    "accessibility/role-has-required-aria-props": "error",
+    "accessibility/role-supports-aria-props": "error",
+    
+    // Import organization
+    "import/order": [
+      "error",
+      {
+        "groups": [
+          "builtin",
+          "external",
+          "internal",
+          "parent",
+          "sibling",
+          "index"
+        ],
+        "newlines-between": "always",
+        "alphabetize": {
+          "order": "asc",
+          "caseInsensitive": true
+        }
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      "extends": ["plugin:testing-library/react"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "out/",
+    "dist/",
+    "public/",
+    "*.config.js"
+  ]
+}
