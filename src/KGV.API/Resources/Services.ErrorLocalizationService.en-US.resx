@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="xml:space" type="xml:space" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  
+  <!-- General Error Messages -->
+  <data name="Error.BadRequest" xml:space="preserve">
+    <value>Bad Request</value>
+    <comment>Bad Request error title</comment>
+  </data>
+  <data name="Error.Unauthorized" xml:space="preserve">
+    <value>Unauthorized</value>
+    <comment>Unauthorized error title</comment>
+  </data>
+  <data name="Error.Forbidden" xml:space="preserve">
+    <value>Forbidden</value>
+    <comment>Forbidden error title</comment>
+  </data>
+  <data name="Error.NotFound" xml:space="preserve">
+    <value>Not Found</value>
+    <comment>Not Found error title</comment>
+  </data>
+  <data name="Error.Conflict" xml:space="preserve">
+    <value>Conflict</value>
+    <comment>Conflict error title</comment>
+  </data>
+  <data name="Error.UnprocessableEntity" xml:space="preserve">
+    <value>Validation Error</value>
+    <comment>Unprocessable Entity error title</comment>
+  </data>
+  <data name="Error.TooManyRequests" xml:space="preserve">
+    <value>Too Many Requests</value>
+    <comment>Too Many Requests error title</comment>
+  </data>
+  <data name="Error.InternalServerError" xml:space="preserve">
+    <value>Internal Server Error</value>
+    <comment>Internal Server Error title</comment>
+  </data>
+
+  <!-- Validation Error Messages -->
+  <data name="Validation.Title" xml:space="preserve">
+    <value>One or more validation errors occurred</value>
+    <comment>General validation error title</comment>
+  </data>
+  <data name="Validation.Generic" xml:space="preserve">
+    <value>Validation error</value>
+    <comment>Generic validation error message</comment>
+  </data>
+  <data name="Validation.Required" xml:space="preserve">
+    <value>The {0} field is required</value>
+    <comment>Required field validation error</comment>
+  </data>
+  <data name="Validation.Range" xml:space="preserve">
+    <value>The {0} field must be between {1} and {2}</value>
+    <comment>Range validation error</comment>
+  </data>
+  <data name="Validation.StringLength" xml:space="preserve">
+    <value>The {0} field must be between {1} and {2} characters long</value>
+    <comment>String length validation error</comment>
+  </data>
+  <data name="Validation.Email" xml:space="preserve">
+    <value>The {0} field must contain a valid email address</value>
+    <comment>Email validation error</comment>
+  </data>
+  <data name="Validation.RegularExpression" xml:space="preserve">
+    <value>The {0} field has an invalid format</value>
+    <comment>Regular expression validation error</comment>
+  </data>
+
+  <!-- Business Rule Error Messages -->
+  <data name="BusinessRule.BezirkNotFound" xml:space="preserve">
+    <value>The specified district was not found</value>
+    <comment>District not found error</comment>
+  </data>
+  <data name="BusinessRule.BezirkHasApplications" xml:space="preserve">
+    <value>The district cannot be deleted because it has associated applications</value>
+    <comment>District has applications error</comment>
+  </data>
+  <data name="BusinessRule.BezirkNameExists" xml:space="preserve">
+    <value>A district with this name already exists</value>
+    <comment>District name already exists error</comment>
+  </data>
+  <data name="BusinessRule.ParzelleNotFound" xml:space="preserve">
+    <value>The specified plot was not found</value>
+    <comment>Plot not found error</comment>
+  </data>
+  <data name="BusinessRule.ParzelleNotAvailable" xml:space="preserve">
+    <value>The plot is not available for assignment</value>
+    <comment>Plot not available for assignment error</comment>
+  </data>
+  <data name="BusinessRule.ParzelleAlreadyAssigned" xml:space="preserve">
+    <value>The plot is already assigned</value>
+    <comment>Plot already assigned error</comment>
+  </data>
+  <data name="BusinessRule.ParzelleNumberExists" xml:space="preserve">
+    <value>A plot with number {0} already exists in this district</value>
+    <comment>Plot number already exists in district error</comment>
+  </data>
+  <data name="BusinessRule.AntragNotFound" xml:space="preserve">
+    <value>The specified application was not found</value>
+    <comment>Application not found error</comment>
+  </data>
+  <data name="BusinessRule.AntragStatusInvalid" xml:space="preserve">
+    <value>The application status is invalid for this operation</value>
+    <comment>Invalid application status for operation error</comment>
+  </data>
+  <data name="BusinessRule.InsufficientPermissions" xml:space="preserve">
+    <value>You do not have sufficient permissions for this operation</value>
+    <comment>Insufficient permissions error</comment>
+  </data>
+  <data name="BusinessRule.RateLimitExceeded" xml:space="preserve">
+    <value>Request rate limit exceeded. Please try again later</value>
+    <comment>Rate limit exceeded error</comment>
+  </data>
+  <data name="BusinessRule.InvalidDateRange" xml:space="preserve">
+    <value>The specified date range is invalid</value>
+    <comment>Invalid date range error</comment>
+  </data>
+  <data name="BusinessRule.RequiredFieldMissing" xml:space="preserve">
+    <value>Required field {0} is missing</value>
+    <comment>Required field missing error</comment>
+  </data>
+  <data name="BusinessRule.InvalidFormat" xml:space="preserve">
+    <value>Field {0} has an invalid format</value>
+    <comment>Invalid format error</comment>
+  </data>
+  <data name="BusinessRule.ValueOutOfRange" xml:space="preserve">
+    <value>Value for {0} is out of valid range</value>
+    <comment>Value out of range error</comment>
+  </data>
+  <data name="BusinessRule.Generic" xml:space="preserve">
+    <value>Business rule error: {0}</value>
+    <comment>Generic business rule error</comment>
+  </data>
+
+  <!-- Operation Messages -->
+  <data name="Operation.Create" xml:space="preserve">
+    <value>Create</value>
+    <comment>Create operation</comment>
+  </data>
+  <data name="Operation.Update" xml:space="preserve">
+    <value>Update</value>
+    <comment>Update operation</comment>
+  </data>
+  <data name="Operation.Delete" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Delete operation</comment>
+  </data>
+  <data name="Operation.Get" xml:space="preserve">
+    <value>Get</value>
+    <comment>Get operation</comment>
+  </data>
+  <data name="Operation.Search" xml:space="preserve">
+    <value>Search</value>
+    <comment>Search operation</comment>
+  </data>
+  <data name="Operation.Assign" xml:space="preserve">
+    <value>Assign</value>
+    <comment>Assign operation</comment>
+  </data>
+
+  <!-- Success Messages -->
+  <data name="Success.Created" xml:space="preserve">
+    <value>Successfully created</value>
+    <comment>Successfully created message</comment>
+  </data>
+  <data name="Success.Updated" xml:space="preserve">
+    <value>Successfully updated</value>
+    <comment>Successfully updated message</comment>
+  </data>
+  <data name="Success.Deleted" xml:space="preserve">
+    <value>Successfully deleted</value>
+    <comment>Successfully deleted message</comment>
+  </data>
+  <data name="Success.Assigned" xml:space="preserve">
+    <value>Successfully assigned</value>
+    <comment>Successfully assigned message</comment>
+  </data>
+
+  <!-- Specific Error Details -->
+  <data name="Detail.InvalidPageSize" xml:space="preserve">
+    <value>Page size must be between 1 and 100</value>
+    <comment>Invalid page size detail</comment>
+  </data>
+  <data name="Detail.InvalidPageNumber" xml:space="preserve">
+    <value>Page number must be greater than 0</value>
+    <comment>Invalid page number detail</comment>
+  </data>
+  <data name="Detail.InvalidSortField" xml:space="preserve">
+    <value>Sort field '{0}' is invalid. Valid fields are: {1}</value>
+    <comment>Invalid sort field detail</comment>
+  </data>
+  <data name="Detail.InvalidSearchTerm" xml:space="preserve">
+    <value>Search term must be at least {0} characters long</value>
+    <comment>Invalid search term detail</comment>
+  </data>
+  <data name="Detail.IdMismatch" xml:space="preserve">
+    <value>URL ID does not match request body ID</value>
+    <comment>ID mismatch detail</comment>
+  </data>
+  <data name="Detail.EmptyGuid" xml:space="preserve">
+    <value>ID cannot be empty</value>
+    <comment>Empty GUID detail</comment>
+  </data>
+</root>

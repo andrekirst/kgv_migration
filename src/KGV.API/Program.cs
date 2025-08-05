@@ -32,6 +32,7 @@ try
     builder.Services.AddAuthorizationConfiguration();
     builder.Services.AddCorsConfiguration();
     builder.Services.AddRateLimitingConfiguration();
+    builder.Services.AddResponseHeaders();
     // builder.Services.AddHealthChecksConfiguration(builder.Configuration); // Temporarily disabled
     builder.Services.AddLocalizationConfiguration();
 
@@ -92,6 +93,7 @@ try
     // Middleware pipeline
     // app.UseHttpsRedirection(); // Temporarily disabled for testing
     app.UseSerilogRequestLogging();
+    app.UseResponseHeaders();
     app.UseRateLimiter();
     app.UseCors("KgvCorsPolicy");
     

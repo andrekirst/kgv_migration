@@ -51,6 +51,11 @@ public class KgvDbContext : DbContext
     /// </summary>
     public DbSet<Verlauf> Verlauf { get; set; } = null!;
 
+    /// <summary>
+    /// Parzellen (Garden plots)
+    /// </summary>
+    public DbSet<Parzelle> Parzellen { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

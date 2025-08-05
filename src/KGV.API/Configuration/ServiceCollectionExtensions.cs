@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using System.Globalization;
 using System.Text;
 using System.Threading.RateLimiting;
+using KGV.API.Filters;
 
 namespace KGV.API.Configuration;
 
@@ -15,7 +16,7 @@ namespace KGV.API.Configuration;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds Swagger/OpenAPI configuration
+    /// Adds Swagger/OpenAPI configuration with comprehensive documentation
     /// </summary>
     public static IServiceCollection AddSwaggerConfiguration(this IServiceCollection services)
     {
@@ -24,12 +25,48 @@ public static class ServiceCollectionExtensions
             c.SwaggerDoc("v1", new OpenApiInfo
             {
                 Title = "KGV API",
-                Version = "v1",
-                Description = "KGV (Kleingartenverein) Management API - A comprehensive API for German allotment garden association management",
+                Version = "v1.0",
+                Description = @"
+# KGV (Kleingartenverein) Management API
+
+A comprehensive REST API for German allotment garden association management, providing complete CRUD operations for:
+
+## Core Features
+- **🏡 Bezirke (Districts)**: Manage garden districts with cadastral area relationships
+- **🌱 Parzellen (Garden Plots)**: Handle plot assignments, availability, and specifications
+- **📝 Anträge (Applications)**: Process membership and plot assignment requests
+- **📊 Statistics**: Generate comprehensive reports and analytics
+
+## API Characteristics
+- **REST Architecture**: Resource-based URLs with proper HTTP verbs
+- **HATEOAS Support**: Hypermedia links for resource navigation
+- **Comprehensive Filtering**: Advanced query parameters for all endpoints
+- **Pagination**: Efficient handling of large datasets
+- **Localization**: German language support with English fallback
+- **Security**: JWT-based authentication with role-based authorization
+- **Rate Limiting**: Protection against abuse with configurable limits
+- **Caching**: Optimized performance with appropriate cache headers
+- **Error Handling**: RFC 7807 Problem Details for consistent error responses
+
+## Authentication
+Use JWT Bearer tokens in the Authorization header:
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+## Rate Limits
+- **Default Policy**: 100 requests per minute
+- **Strict Policy**: 10 requests per minute (for sensitive operations)
+
+## Response Formats
+All responses follow consistent patterns with appropriate HTTP status codes and headers.
+",
+                TermsOfService = new Uri("https://kgv.de/terms"),
                 Contact = new OpenApiContact
                 {
-                    Name = "KGV API Team",
-                    Email = "api@kgv.de"
+                    Name = "KGV API Development Team",
+                    Email = "api-support@kgv.de",
+                    Url = new Uri("https://kgv.de/contact")
                 },
                 License = new OpenApiLicense
                 {
@@ -38,14 +75,40 @@ public static class ServiceCollectionExtensions
                 }
             });
 
+            // Add servers for different environments
+            c.AddServer(new OpenApiServer
+            {
+                Url = "https://api.kgv.de",
+                Description = "Production Server"
+            });
+            
+            c.AddServer(new OpenApiServer
+            {
+                Url = "https://staging-api.kgv.de",
+                Description = "Staging Server"
+            });
+            
+            c.AddServer(new OpenApiServer
+            {
+                Url = "https://localhost:5000",
+                Description = "Development Server"
+            });
+
             // Add JWT authentication to Swagger
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
-                Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+                Description = @"JWT Authorization header using the Bearer scheme.
+                
+**Enter your token in the text input below.**
+
+Example: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+You can obtain a token by calling the `/auth/login` endpoint with valid credentials.",
                 Name = "Authorization",
                 In = ParameterLocation.Header,
-                Type = SecuritySchemeType.ApiKey,
-                Scheme = "Bearer"
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT"
             });
 
             c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -68,23 +131,42 @@ public static class ServiceCollectionExtensions
             var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
             if (File.Exists(xmlPath))
             {
-                c.IncludeXmlComments(xmlPath);
+                c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
             }
 
             // Include XML comments from other projects
             var applicationXmlPath = Path.Combine(AppContext.BaseDirectory, "KGV.Application.xml");
             if (File.Exists(applicationXmlPath))
             {
-                c.IncludeXmlComments(applicationXmlPath);
+                c.IncludeXmlComments(applicationXmlPath, includeControllerXmlComments: true);
             }
 
             var domainXmlPath = Path.Combine(AppContext.BaseDirectory, "KGV.Domain.xml");
             if (File.Exists(domainXmlPath))
             {
-                c.IncludeXmlComments(domainXmlPath);
+                c.IncludeXmlComments(domainXmlPath, includeControllerXmlComments: true);
             }
 
-            c.EnableAnnotations();
+            // Enable annotations for enhanced documentation
+            c.EnableAnnotations(enableAnnotationsForInheritance: true, enableAnnotationsForPolymorphism: true);
+
+            // Configure schema generation
+            c.SchemaFilter<EnumSchemaFilter>();
+            c.OperationFilter<ResponseHeadersOperationFilter>();
+            c.DocumentFilter<LowercaseDocumentFilter>();
+
+            // Configure example generation
+            c.OperationFilter<ExampleOperationFilter>();
+
+            // Use full type names for schema IDs to avoid conflicts
+            c.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
+
+            // Configure for proper API versioning
+            c.DocInclusionPredicate((name, api) => true);
+            
+            // Order actions by relative path
+            c.OrderActionsBy(apiDesc => 
+                $"{apiDesc.ActionDescriptor.RouteValues["controller"]}_{apiDesc.RelativePath}");
         });
 
         return services;
@@ -234,7 +316,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds localization configuration
+    /// Adds localization configuration with error localization service
     /// </summary>
     public static IServiceCollection AddLocalizationConfiguration(this IServiceCollection services)
     {
@@ -257,6 +339,9 @@ public static class ServiceCollectionExtensions
 
             options.RequestCultureProviders.Insert(0, new Microsoft.AspNetCore.Localization.QueryStringRequestCultureProvider());
         });
+
+        // Register error localization service
+        services.AddScoped<KGV.API.Services.IErrorLocalizationService, KGV.API.Services.ErrorLocalizationService>();
 
         return services;
     }

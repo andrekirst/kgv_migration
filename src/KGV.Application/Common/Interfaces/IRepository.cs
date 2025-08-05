@@ -1,3 +1,4 @@
+using KGV.Application.Common.Models;
 using KGV.Domain.Common;
 using System.Linq.Expressions;
 
@@ -100,4 +101,31 @@ public interface IRepository<TEntity> where TEntity : BaseEntity
     /// Restores a soft-deleted entity
     /// </summary>
     Task RestoreAsync(Guid id, CancellationToken cancellationToken = default);
+
+    // Specification Pattern Methods
+
+    /// <summary>
+    /// Gets entities using a specification
+    /// </summary>
+    Task<IEnumerable<TEntity>> GetAsync(ISpecification<TEntity> specification, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a single entity using a specification
+    /// </summary>
+    Task<TEntity?> GetSingleAsync(ISpecification<TEntity> specification, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets entities with pagination using a specification
+    /// </summary>
+    Task<PagedResult<TEntity>> GetPagedAsync(ISpecification<TEntity> specification, PaginationParameters pagination, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts entities using a specification
+    /// </summary>
+    Task<int> CountAsync(ISpecification<TEntity> specification, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if any entity matches the specification
+    /// </summary>
+    Task<bool> AnyAsync(ISpecification<TEntity> specification, CancellationToken cancellationToken = default);
 }

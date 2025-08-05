@@ -1,5 +1,8 @@
 using KGV.Application.Common.Interfaces;
 using KGV.Infrastructure.Data;
+using KGV.Infrastructure.Data.Repositories;
+using KGV.Infrastructure.Repositories.Interfaces;
+using KGV.Infrastructure.Repositories.Implementations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +49,9 @@ public static class DependencyInjection
         // Add Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        // Add Repository Pattern Services
+        AddRepositories(services);
+
         // Add Redis caching (if configured)
         var redisConnectionString = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrEmpty(redisConnectionString))
@@ -66,6 +72,19 @@ public static class DependencyInjection
         AddHealthChecks(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Adds repository pattern services to the DI container
+    /// </summary>
+    private static void AddRepositories(IServiceCollection services)
+    {
+        // Generic repository (base implementation)
+        services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
+        // Specific repository implementations for Bezirksverwaltung
+        services.AddScoped<IBezirkRepository, BezirkRepository>();
+        services.AddScoped<IParzelleRepository, ParzelleRepository>();
     }
 
     /// <summary>

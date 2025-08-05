@@ -1,4 +1,5 @@
 using KGV.Domain.Common;
+using KGV.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace KGV.Domain.Entities;
@@ -38,6 +39,23 @@ public class Bezirk : BaseEntity
     public int SortOrder { get; private set; }
 
     /// <summary>
+    /// Total area of the district in square meters
+    /// </summary>
+    [Range(0.00, 1000000.00)]
+    public decimal? Flaeche { get; private set; }
+
+    /// <summary>
+    /// Number of plots (Parzellen) in this district
+    /// </summary>
+    [Range(0, int.MaxValue)]
+    public int AnzahlParzellen { get; private set; } = 0;
+
+    /// <summary>
+    /// Current status of the district
+    /// </summary>
+    public BezirkStatus Status { get; private set; } = BezirkStatus.Active;
+
+    /// <summary>
     /// Navigation property to related cadastral districts
     /// </summary>
     public virtual ICollection<Katasterbezirk> Katasterbezirke { get; private set; } = new List<Katasterbezirk>();
@@ -53,13 +71,25 @@ public class Bezirk : BaseEntity
     public virtual ICollection<Eingangsnummer> Eingangsnummern { get; private set; } = new List<Eingangsnummer>();
 
     /// <summary>
+    /// Navigation property to related plots (Parzellen)
+    /// </summary>
+    public virtual ICollection<Parzelle> Parzellen { get; private set; } = new List<Parzelle>();
+
+    /// <summary>
+    /// Navigation property to junction table mappings
+    /// </summary>
+    public virtual ICollection<BezirkeKatasterbezirke> BezirkeKatasterbezirke { get; private set; } = new List<BezirkeKatasterbezirke>();
+
+    /// <summary>
     /// Creates a new Bezirk
     /// </summary>
     /// <param name="name">District name/identifier</param>
     /// <param name="displayName">Full display name</param>
     /// <param name="description">Description</param>
     /// <param name="sortOrder">Sort order</param>
-    public static Bezirk Create(string name, string? displayName = null, string? description = null, int sortOrder = 0)
+    /// <param name="flaeche">Total area in square meters</param>
+    /// <param name="status">Initial status</param>
+    public static Bezirk Create(string name, string? displayName = null, string? description = null, int sortOrder = 0, decimal? flaeche = null, BezirkStatus status = BezirkStatus.Active)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required", nameof(name));
@@ -73,7 +103,9 @@ public class Bezirk : BaseEntity
             DisplayName = displayName?.Trim(),
             Description = description?.Trim(),
             SortOrder = sortOrder,
-            IsActive = true
+            Flaeche = flaeche,
+            Status = status,
+            IsActive = status == BezirkStatus.Active
         };
 
         return bezirk;
@@ -82,7 +114,7 @@ public class Bezirk : BaseEntity
     /// <summary>
     /// Updates the district information
     /// </summary>
-    public void Update(string? displayName = null, string? description = null, int? sortOrder = null)
+    public void Update(string? displayName = null, string? description = null, int? sortOrder = null, decimal? flaeche = null)
     {
         if (displayName != null)
             DisplayName = displayName.Trim();
@@ -93,6 +125,26 @@ public class Bezirk : BaseEntity
         if (sortOrder.HasValue)
             SortOrder = sortOrder.Value;
 
+        if (flaeche.HasValue)
+        {
+            if (flaeche.Value < 0)
+                throw new ArgumentException("Flaeche cannot be negative", nameof(flaeche));
+            Flaeche = flaeche.Value;
+        }
+
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Changes the status of the district
+    /// </summary>
+    public void ChangeStatus(BezirkStatus newStatus)
+    {
+        if (Status == newStatus)
+            return;
+
+        Status = newStatus;
+        IsActive = newStatus == BezirkStatus.Active;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -101,11 +153,7 @@ public class Bezirk : BaseEntity
     /// </summary>
     public void Activate()
     {
-        if (!IsActive)
-        {
-            IsActive = true;
-            UpdatedAt = DateTime.UtcNow;
-        }
+        ChangeStatus(BezirkStatus.Active);
     }
 
     /// <summary>
@@ -113,9 +161,62 @@ public class Bezirk : BaseEntity
     /// </summary>
     public void Deactivate()
     {
-        if (IsActive)
+        ChangeStatus(BezirkStatus.Inactive);
+    }
+
+    /// <summary>
+    /// Suspends the district temporarily
+    /// </summary>
+    public void Suspend()
+    {
+        ChangeStatus(BezirkStatus.Suspended);
+    }
+
+    /// <summary>
+    /// Marks the district as under restructuring
+    /// </summary>
+    public void MarkUnderRestructuring()
+    {
+        ChangeStatus(BezirkStatus.UnderRestructuring);
+    }
+
+    /// <summary>
+    /// Archives the district
+    /// </summary>
+    public void Archive()
+    {
+        ChangeStatus(BezirkStatus.Archived);
+    }
+
+    /// <summary>
+    /// Updates the plot count for this district
+    /// </summary>
+    public void UpdatePlotCount(int count)
+    {
+        if (count < 0)
+            throw new ArgumentException("Plot count cannot be negative", nameof(count));
+
+        AnzahlParzellen = count;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Increments the plot count
+    /// </summary>
+    public void IncrementPlotCount()
+    {
+        AnzahlParzellen++;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Decrements the plot count
+    /// </summary>
+    public void DecrementPlotCount()
+    {
+        if (AnzahlParzellen > 0)
         {
-            IsActive = false;
+            AnzahlParzellen--;
             UpdatedAt = DateTime.UtcNow;
         }
     }
@@ -126,6 +227,40 @@ public class Bezirk : BaseEntity
     public string GetDisplayName()
     {
         return !string.IsNullOrWhiteSpace(DisplayName) ? DisplayName : Name;
+    }
+
+    /// <summary>
+    /// Gets the status description in German
+    /// </summary>
+    public string GetStatusDescription()
+    {
+        return Status switch
+        {
+            BezirkStatus.Inactive => "Inaktiv",
+            BezirkStatus.Active => "Aktiv",
+            BezirkStatus.Suspended => "Gesperrt",
+            BezirkStatus.UnderRestructuring => "Umstrukturierung",
+            BezirkStatus.Archived => "Archiviert",
+            _ => "Unbekannt"
+        };
+    }
+
+    /// <summary>
+    /// Checks if the district can accept new plots
+    /// </summary>
+    public bool CanAcceptNewPlots()
+    {
+        return Status == BezirkStatus.Active || Status == BezirkStatus.UnderRestructuring;
+    }
+
+    /// <summary>
+    /// Gets the average plot size if area and plot count are available
+    /// </summary>
+    public decimal? GetAveragePlotSize()
+    {
+        if (Flaeche.HasValue && AnzahlParzellen > 0)
+            return Flaeche.Value / AnzahlParzellen;
+        return null;
     }
 
     private Bezirk()

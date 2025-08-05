@@ -49,6 +49,11 @@ public class Katasterbezirk : BaseEntity
     public virtual Bezirk Bezirk { get; private set; } = null!;
 
     /// <summary>
+    /// Navigation property to junction table mappings
+    /// </summary>
+    public virtual ICollection<BezirkeKatasterbezirke> BezirkeKatasterbezirke { get; private set; } = new List<BezirkeKatasterbezirke>();
+
+    /// <summary>
     /// Creates a new Katasterbezirk
     /// </summary>
     /// <param name="bezirkId">Parent district ID</param>
@@ -143,6 +148,22 @@ public class Katasterbezirk : BaseEntity
     public string GetFullDisplayName()
     {
         return $"{KatasterbezirkCode} - {KatasterbezirkName}";
+    }
+
+    /// <summary>
+    /// Checks if this cadastral district is mapped to any districts via junction table
+    /// </summary>
+    public bool HasJunctionMappings()
+    {
+        return BezirkeKatasterbezirke.Any(m => m.IsActive);
+    }
+
+    /// <summary>
+    /// Gets all active junction mappings for this cadastral district
+    /// </summary>
+    public IEnumerable<BezirkeKatasterbezirke> GetActiveJunctionMappings()
+    {
+        return BezirkeKatasterbezirke.Where(m => m.IsActive);
     }
 
     private Katasterbezirk()
