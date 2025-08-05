@@ -32,7 +32,7 @@ try
     builder.Services.AddAuthorizationConfiguration();
     builder.Services.AddCorsConfiguration();
     builder.Services.AddRateLimitingConfiguration();
-    builder.Services.AddHealthChecksConfiguration(builder.Configuration);
+    // builder.Services.AddHealthChecksConfiguration(builder.Configuration); // Temporarily disabled
     builder.Services.AddLocalizationConfiguration();
 
     // Add application layers
@@ -44,10 +44,10 @@ try
     {
         opt.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
         opt.AssumeDefaultVersionWhenUnspecified = true;
-        opt.ApiVersionReader = Microsoft.AspNetCore.Mvc.ApiVersionReader.Combine(
-            new Microsoft.AspNetCore.Mvc.QueryStringApiVersionReader("apiVersion"),
-            new Microsoft.AspNetCore.Mvc.HeaderApiVersionReader("X-Version"),
-            new Microsoft.AspNetCore.Mvc.UrlSegmentApiVersionReader());
+        opt.ApiVersionReader = Microsoft.AspNetCore.Mvc.Versioning.ApiVersionReader.Combine(
+            new Microsoft.AspNetCore.Mvc.Versioning.QueryStringApiVersionReader("apiVersion"),
+            new Microsoft.AspNetCore.Mvc.Versioning.HeaderApiVersionReader("X-Version"),
+            new Microsoft.AspNetCore.Mvc.Versioning.UrlSegmentApiVersionReader());
     });
 
     builder.Services.AddVersionedApiExplorer(setup =>
@@ -90,7 +90,7 @@ try
     });
 
     // Middleware pipeline
-    app.UseHttpsRedirection();
+    // app.UseHttpsRedirection(); // Temporarily disabled for testing
     app.UseSerilogRequestLogging();
     app.UseRateLimiter();
     app.UseCors("KgvCorsPolicy");
@@ -104,23 +104,23 @@ try
     // Metrics
     app.UseHttpMetrics();
 
-    // Health checks
-    app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
-    {
-        ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    // Health checks - temporarily disabled
+    // app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
+    // {
+    //     ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
+    // });
 
-    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
-    {
-        Predicate = check => check.Tags.Contains("ready"),
-        ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    // app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
+    // {
+    //     Predicate = check => check.Tags.Contains("ready"),
+    //     ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
+    // });
 
-    app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
-    {
-        Predicate = _ => false,
-        ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    // app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
+    // {
+    //     Predicate = _ => false,
+    //     ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
+    // });
 
     // Prometheus metrics endpoint
     app.MapMetrics();

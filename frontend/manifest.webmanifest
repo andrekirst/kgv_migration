@@ -1,0 +1,108 @@
+{
+  "name": "KGV Verwaltung",
+  "short_name": "KGV",
+  "description": "Kleingartenverein Verwaltungssystem - Moderne Lösung für die Antragsverwaltung",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "de",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "government"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512", 
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard Übersicht"
+    },
+    {
+      "src": "/screenshots/mobile-antraege.png", 
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Anträge mobil"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Neuer Antrag",
+      "short_name": "Neu",
+      "description": "Einen neuen Kleingartenantrag erstellen",
+      "url": "/antraege/neu",
+      "icons": [
+        {
+          "src": "/icons/new-application.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Anträge suchen",
+      "short_name": "Suchen", 
+      "description": "Bestehende Anträge durchsuchen",
+      "url": "/antraege",
+      "icons": [
+        {
+          "src": "/icons/search.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Übersicht",
+      "description": "Zur Dashboard-Übersicht",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icons/dashboard.png", 
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://kgv.local/manifest.webmanifest"
+    }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"  
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+kgv",
+      "url": "/antrag?id=%s"
+    }
+  ]
+}

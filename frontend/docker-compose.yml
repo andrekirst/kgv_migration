@@ -1,0 +1,225 @@
+# Docker Compose for KGV Frontend Development and Production
+version: '3.8'
+
+services:
+  # Frontend service
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+        - NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV:-production}
+    container_name: kgv-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:5000/api}
+      - NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV:-production}
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    depends_on:
+      - api
+    networks:
+      - kgv-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/app/scripts/health-check.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`kgv.local`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    volumes:
+      # Optional: Mount for development logs
+      - frontend-logs:/app/.next/trace
+
+  # Frontend development service
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: kgv-frontend-dev
+    ports:
+      - "${FRONTEND_DEV_PORT:-3001}:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+      - NEXT_PUBLIC_APP_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - kgv-network
+    profiles:
+      - development
+    stdin_open: true
+    tty: true
+
+  # Backend API service (placeholder - should reference actual backend)
+  api:
+    image: kgv-api:latest
+    container_name: kgv-api
+    ports:
+      - "${API_PORT:-5000}:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}
+      - JWT__SecretKey=${JWT_SECRET_KEY}
+      - JWT__Issuer=${JWT_ISSUER:-KGV}
+      - JWT__Audience=${JWT_AUDIENCE:-KGV-Frontend}
+      - CORS__AllowedOrigins=${CORS_ORIGINS:-http://localhost:3000,https://kgv.local}
+    depends_on:
+      - database
+    networks:
+      - kgv-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Database service
+  database:
+    image: postgres:15-alpine
+    container_name: kgv-database
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-kgv}
+      - POSTGRES_USER=${POSTGRES_USER:-kgv_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-kgv_password}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=de_DE.UTF-8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - kgv-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kgv_user} -d ${POSTGRES_DB:-kgv}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: kgv-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - kgv-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - with-cache
+
+  # Reverse proxy (Traefik)
+  traefik:
+    image: traefik:v3.0
+    container_name: kgv-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@kgv.local}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    networks:
+      - kgv-network
+    restart: unless-stopped
+    profiles:
+      - with-proxy
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kgv-prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - kgv-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana for dashboards (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kgv-grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - kgv-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+# Networks
+networks:
+  kgv-network:
+    driver: bridge
+    name: kgv-network
+
+# Volumes
+volumes:
+  postgres-data:
+    name: kgv-postgres-data
+  redis-data:
+    name: kgv-redis-data
+  frontend-logs:
+    name: kgv-frontend-logs
+  traefik-certs:
+    name: kgv-traefik-certs
+  prometheus-data:
+    name: kgv-prometheus-data
+  grafana-data:
+    name: kgv-grafana-data

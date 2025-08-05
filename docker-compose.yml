@@ -62,8 +62,8 @@ services:
     container_name: kgv-api
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
-      - ASPNETCORE_URLS=http://+:8080;https://+:8443
-      - ASPNETCORE_HTTPS_PORT=8443
+      - ASPNETCORE_URLS=http://+:8080
+      # - ASPNETCORE_HTTPS_PORT=8445  # Disabled for HTTP-only testing
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=kgv_db;Username=kgv_user;Password=${POSTGRES_PASSWORD:-kgv_secure_password_2024};Include Error Detail=true;
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-redis_secure_password_2024}
       - JwtSettings__SecretKey=${JWT_SECRET_KEY:-your-super-secret-jwt-key-that-should-be-at-least-32-chars-long}
@@ -76,7 +76,6 @@ services:
       - TZ=Europe/Berlin
     ports:
       - "8080:8080"
-      - "8443:8443"
     volumes:
       - api_logs:/app/logs
       - ${ASPNETCORE_HTTPS_CERT_PATH:-./certs}:/app/certs:ro
@@ -160,19 +159,51 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # KGV Frontend (Next.js)
+  kgv-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: kgv-frontend
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://kgv-api:8080/api
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - kgv-api
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - kgv-network
+    security_opt:
+      - no-new-privileges:true
+
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
     container_name: kgv-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "8090:80"
+      - "8446:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - nginx_logs:/var/log/nginx
     depends_on:
       - kgv-api
+      - kgv-frontend
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s

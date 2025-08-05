@@ -43,8 +43,8 @@ public class ExceptionHandlingMiddleware
                 validationEx.Errors.GroupBy(e => e.PropertyName)
                     .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray())
             ),
-            ArgumentException => (HttpStatusCode.BadRequest, exception.Message, null),
             ArgumentNullException => (HttpStatusCode.BadRequest, "Required parameter is missing", null),
+            ArgumentException => (HttpStatusCode.BadRequest, exception.Message, null),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Unauthorized access", null),
             NotImplementedException => (HttpStatusCode.NotImplemented, "Feature not implemented", null),
             TimeoutException => (HttpStatusCode.RequestTimeout, "Request timeout", null),

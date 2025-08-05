@@ -141,7 +141,7 @@ namespace KGV.Infrastructure.Patterns.CQRS
                     queryName, query.CorrelationId);
 
                 // Validate query
-                await ValidateQuery(query);
+                await ValidateQuery<TQuery, TResult>(query);
 
                 // Get handler
                 var handler = _serviceProvider.GetRequiredService<IQueryHandler<TQuery, TResult>>();
@@ -291,7 +291,7 @@ namespace KGV.Infrastructure.Patterns.CQRS
         Task<ValidationResult> ValidateAsync(TCommand command);
     }
 
-    public interface IQueryValidator<in TQuery> where TQuery : IQuery<object>
+    public interface IQueryValidator<in TQuery>
     {
         Task<ValidationResult> ValidateAsync(TQuery query);
     }

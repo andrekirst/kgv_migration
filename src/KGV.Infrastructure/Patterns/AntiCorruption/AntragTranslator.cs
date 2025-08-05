@@ -13,7 +13,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
     /// Anti-Corruption Layer implementation for Antrag (Application) translation
     /// Handles complex business logic translation between legacy and modern models
     /// </summary>
-    public class AntragTranslator : ILegacyDataTranslator<LegacyAntrag, Application>
+    public class AntragTranslator : ILegacyDataTranslator<LegacyAntrag, ModernModels.Application>
     {
         private readonly ILogger<AntragTranslator> _logger;
         private readonly TranslationMetrics _metrics;
@@ -24,7 +24,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
             _metrics = metrics;
         }
 
-        public async Task<Application> TranslateToModernAsync(LegacyAntrag legacyModel)
+        public async Task<ModernModels.Application> TranslateToModernAsync(LegacyAntrag legacyModel)
         {
             if (legacyModel == null)
             {
@@ -36,7 +36,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
 
             try
             {
-                var application = new Application
+                var application = new ModernModels.Application
                 {
                     Id = legacyModel.an_ID,
                     FileReference = legacyModel.an_Aktenzeichen,
@@ -72,7 +72,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
             }
         }
 
-        public async Task<LegacyAntrag> TranslateToLegacyAsync(Application modernModel)
+        public async Task<LegacyAntrag> TranslateToLegacyAsync(ModernModels.Application modernModel)
         {
             if (modernModel == null)
             {
@@ -146,15 +146,15 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
             }
         }
 
-        public async Task<IEnumerable<Application>> TranslateBatchToModernAsync(IEnumerable<LegacyAntrag> legacyModels)
+        public async Task<IEnumerable<ModernModels.Application>> TranslateBatchToModernAsync(IEnumerable<LegacyAntrag> legacyModels)
         {
             if (legacyModels == null)
-                return Enumerable.Empty<Application>();
+                return Enumerable.Empty<ModernModels.Application>();
 
             var legacyList = legacyModels.ToList();
             _logger.LogInformation("Starting batch translation of {Count} legacy applications", legacyList.Count);
 
-            var results = new List<Application>();
+            var results = new List<ModernModels.Application>();
             var errors = 0;
 
             foreach (var legacy in legacyList)
@@ -178,7 +178,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
             return results;
         }
 
-        public async Task<bool> ValidateTranslationAsync(LegacyAntrag legacy, Application modern)
+        public async Task<bool> ValidateTranslationAsync(LegacyAntrag legacy, ModernModels.Application modern)
         {
             if (legacy == null || modern == null)
                 return false;

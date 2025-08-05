@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using KGV.Domain.Common;
 using KGV.Domain.Entities;
 using KGV.Domain.ValueObjects;

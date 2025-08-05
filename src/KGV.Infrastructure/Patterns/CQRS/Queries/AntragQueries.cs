@@ -67,7 +67,7 @@ namespace KGV.Infrastructure.Patterns.CQRS.Queries
             }
         }
 
-        private ApplicationDetailDto MapToDetailDto(Application application, bool includeHistory, bool includeMetadata)
+        private ApplicationDetailDto MapToDetailDto(AntiCorruption.ModernModels.Application application, bool includeHistory, bool includeMetadata)
         {
             var dto = new ApplicationDetailDto
             {
@@ -257,7 +257,7 @@ namespace KGV.Infrastructure.Patterns.CQRS.Queries
             }
         }
 
-        private ApplicationSummaryDto MapToSummaryDto(Application application)
+        private ApplicationSummaryDto MapToSummaryDto(AntiCorruption.ModernModels.Application application)
         {
             return new ApplicationSummaryDto
             {
@@ -384,7 +384,7 @@ namespace KGV.Infrastructure.Patterns.CQRS.Queries
             }
         }
 
-        private ApplicationSummaryDto MapToSummaryDto(Application application)
+        private ApplicationSummaryDto MapToSummaryDto(AntiCorruption.ModernModels.Application application)
         {
             return new ApplicationSummaryDto
             {
@@ -519,10 +519,10 @@ namespace KGV.Infrastructure.Patterns.CQRS.Queries
 
     public interface IApplicationReadRepository
     {
-        Task<Application> GetByIdAsync(Guid id, bool includeHistory = false);
-        Task<PagedResult<Application>> SearchApplicationsAsync(ApplicationSearchCriteria criteria);
+        Task<AntiCorruption.ModernModels.Application> GetByIdAsync(Guid id, bool includeHistory = false);
+        Task<PagedResult<AntiCorruption.ModernModels.Application>> SearchApplicationsAsync(ApplicationSearchCriteria criteria);
         Task<ApplicationStatistics> GetStatisticsAsync(DateTime? fromDate, DateTime? toDate, string district);
-        Task<IEnumerable<Application>> GetByStatusAsync(ApplicationStatus status, int? limit, DateTime? createdSince);
+        Task<IEnumerable<AntiCorruption.ModernModels.Application>> GetByStatusAsync(ApplicationStatus status, int? limit, DateTime? createdSince);
     }
 
     public class ApplicationSearchCriteria

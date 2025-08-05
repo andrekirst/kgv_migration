@@ -23,7 +23,7 @@ namespace KGV.Infrastructure.Patterns.Caching
         private readonly RedisCacheOptions _options;
         private readonly ICacheKeyBuilder _keyBuilder;
         private readonly SemaphoreSlim _connectionSemaphore;
-        private readonly Dictionary<string, CacheConfiguration> _configurations;
+        private readonly Dictionary<string, CacheSettings> _configurations;
 
         // Events
         public event Action<CacheHitEvent> CacheHit;
@@ -280,7 +280,7 @@ namespace KGV.Infrastructure.Patterns.Caching
                     CacheRemoved?.Invoke(new CacheRemovedEvent
                     {
                         Pattern = pattern,
-                        Count = deletedCount,
+                        Count = (int)deletedCount,
                         Timestamp = DateTime.UtcNow
                     });
                 }
@@ -572,12 +572,12 @@ namespace KGV.Infrastructure.Patterns.Caching
             return _options.DefaultExpiration;
         }
 
-        private Dictionary<string, CacheConfiguration> LoadCacheConfigurations()
+        private Dictionary<string, CacheSettings> LoadCacheConfigurations()
         {
-            var configurations = new Dictionary<string, CacheConfiguration>();
+            var configurations = new Dictionary<string, CacheSettings>();
 
             // Configure entity-specific cache settings
-            configurations["application"] = new CacheConfiguration
+            configurations["application"] = new CacheSettings
             {
                 KeyPrefix = "app:",
                 DefaultExpiration = TimeSpan.FromMinutes(30),
@@ -585,7 +585,7 @@ namespace KGV.Infrastructure.Patterns.Caching
                 SerializationMethod = CacheSerializationMethod.Json
             };
 
-            configurations["person"] = new CacheConfiguration
+            configurations["person"] = new CacheSettings
             {
                 KeyPrefix = "person:",
                 DefaultExpiration = TimeSpan.FromHours(1),
@@ -593,7 +593,7 @@ namespace KGV.Infrastructure.Patterns.Caching
                 SerializationMethod = CacheSerializationMethod.Json
             };
 
-            configurations["district"] = new CacheConfiguration
+            configurations["district"] = new CacheSettings
             {
                 KeyPrefix = "district:",
                 DefaultExpiration = TimeSpan.FromHours(24),
@@ -601,7 +601,7 @@ namespace KGV.Infrastructure.Patterns.Caching
                 SerializationMethod = CacheSerializationMethod.Json
             };
 
-            configurations["statistics"] = new CacheConfiguration
+            configurations["statistics"] = new CacheSettings
             {
                 KeyPrefix = "stats:",
                 DefaultExpiration = TimeSpan.FromMinutes(5),

@@ -124,7 +124,7 @@ namespace KGV.Infrastructure.Patterns.Messaging
             var throttling = GetOrCreateThrottling(queueName);
 
             // Record processing time
-            metrics.ProcessingTimes.Add(new ProcessingTimeRecord
+            metrics.ProcessingTimes.Enqueue(new ProcessingTimeRecord
             {
                 Duration = processingTime,
                 Success = success,
@@ -400,8 +400,8 @@ namespace KGV.Infrastructure.Patterns.Messaging
     {
         public string QueueName { get; set; }
         public int CurrentLoad { get; set; }
-        public long SuccessCount { get; set; }
-        public long ErrorCount { get; set; }
+        public long SuccessCount;
+        public long ErrorCount;
         public long QueueBacklog { get; set; }
         public DateTime LastActivity { get; set; }
         public ConcurrentQueue<ProcessingTimeRecord> ProcessingTimes { get; set; }
@@ -427,8 +427,8 @@ namespace KGV.Infrastructure.Patterns.Messaging
         public DateTime? ThrottleUntil { get; set; }
         public TimeSpan CurrentThrottleDelay { get; set; }
         public DateTime LastProcessingTime { get; set; }
-        public long ConsecutiveFailures { get; set; }
-        public long ConsecutiveSuccesses { get; set; }
+        public long ConsecutiveFailures;
+        public long ConsecutiveSuccesses;
     }
 
     /// <summary>
