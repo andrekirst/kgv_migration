@@ -231,4 +231,35 @@ public static class SearchExpressionExtensions
         var body = Expression.OrElse(leftBody, rightBody);
         return Expression.Lambda<Func<T, bool>>(body, parameter);
     }
+
+    public static Expression<Func<T, bool>> And<T>(
+        this Expression<Func<T, bool>> left,
+        Expression<Func<T, bool>> right)
+    {
+        var parameter = Expression.Parameter(typeof(T));
+        var leftBody = new ReplaceParameterVisitor(left.Parameters[0], parameter).Visit(left.Body);
+        var rightBody = new ReplaceParameterVisitor(right.Parameters[0], parameter).Visit(right.Body);
+        var body = Expression.AndAlso(leftBody, rightBody);
+        return Expression.Lambda<Func<T, bool>>(body, parameter);
+    }
+}
+
+/// <summary>
+/// Parameter replacement visitor for expression trees
+/// </summary>
+public class ReplaceParameterVisitor : ExpressionVisitor
+{
+    private readonly ParameterExpression _oldParameter;
+    private readonly ParameterExpression _newParameter;
+
+    public ReplaceParameterVisitor(ParameterExpression oldParameter, ParameterExpression newParameter)
+    {
+        _oldParameter = oldParameter;
+        _newParameter = newParameter;
+    }
+
+    protected override Expression VisitParameter(ParameterExpression node)
+    {
+        return node == _oldParameter ? _newParameter : base.VisitParameter(node);
+    }
 }

@@ -47,9 +47,9 @@ public class AssignParzelleCommandHandler : IRequestHandler<AssignParzelleComman
         try
         {
             // Retrieve the Parzelle with Bezirk
-            var parzelle = await _parzelleRepository.FirstOrDefaultAsync(
+            var parzelle = await _parzelleRepository.GetFirstOrDefaultAsync(
                 p => p.Id == request.ParzelleId,
-                p => p.Bezirk,
+                "Bezirk",
                 cancellationToken);
 
             if (parzelle == null)
@@ -109,7 +109,7 @@ public class AssignParzelleCommandHandler : IRequestHandler<AssignParzelleComman
             }
 
             // Update repository
-            _parzelleRepository.Update(parzelle);
+            await _parzelleRepository.UpdateAsync(parzelle, cancellationToken);
 
             // Save changes
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -162,8 +162,9 @@ public class AssignParzelleCommandHandler : IRequestHandler<AssignParzelleComman
     {
         if (request.PersonId.HasValue)
         {
-            var person = await _personRepository.FirstOrDefaultAsync(
+            var person = await _personRepository.GetFirstOrDefaultAsync(
                 p => p.Id == request.PersonId.Value,
+                "",
                 cancellationToken);
 
             if (person == null)
@@ -175,8 +176,9 @@ public class AssignParzelleCommandHandler : IRequestHandler<AssignParzelleComman
 
         if (request.AntragId.HasValue)
         {
-            var antrag = await _antragRepository.FirstOrDefaultAsync(
+            var antrag = await _antragRepository.GetFirstOrDefaultAsync(
                 a => a.Id == request.AntragId.Value,
+                "",
                 cancellationToken);
 
             if (antrag == null)
@@ -208,6 +210,8 @@ public class AssignParzelleCommandHandler : IRequestHandler<AssignParzelleComman
                      p.Id != assignedParzelle.Id &&
                      p.Status == ParzellenStatus.Available &&
                      p.Prioritaet == assignedParzelle.Prioritaet, // Same priority level
+                null,
+                "",
                 cancellationToken);
 
             var plotsToReserve = relatedPlots
@@ -222,7 +226,7 @@ public class AssignParzelleCommandHandler : IRequestHandler<AssignParzelleComman
                 {
                     plot.SetUpdatedBy(assignedBy);
                 }
-                _parzelleRepository.Update(plot);
+                await _parzelleRepository.UpdateAsync(plot, cancellationToken);
 
                 _logger.LogInformation("Reserved related Parzelle {ParzelleId} ({FullDisplayName}) due to assignment of {AssignedParzelleId}", 
                     plot.Id, plot.GetFullDisplayName(), assignedParzelle.Id);

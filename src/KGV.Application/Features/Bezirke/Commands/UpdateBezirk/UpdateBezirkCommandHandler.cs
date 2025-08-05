@@ -38,7 +38,7 @@ public class UpdateBezirkCommandHandler : IRequestHandler<UpdateBezirkCommand, R
         try
         {
             // Retrieve the existing Bezirk
-            var bezirk = await _bezirkRepository.FirstOrDefaultAsync(
+            var bezirk = await _bezirkRepository.GetFirstOrDefaultAsync(
                 b => b.Id == request.Id,
                 cancellationToken);
 
@@ -68,7 +68,7 @@ public class UpdateBezirkCommandHandler : IRequestHandler<UpdateBezirkCommand, R
             }
 
             // Update repository
-            _bezirkRepository.Update(bezirk);
+            await _bezirkRepository.UpdateAsync(bezirk, cancellationToken);
 
             // Save changes
             await _unitOfWork.SaveChangesAsync(cancellationToken);

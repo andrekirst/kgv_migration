@@ -42,8 +42,9 @@ public class CreateParzelleCommandHandler : IRequestHandler<CreateParzelleComman
         try
         {
             // Verify that the Bezirk exists and can accept new plots
-            var bezirk = await _bezirkRepository.FirstOrDefaultAsync(
+            var bezirk = await _bezirkRepository.GetFirstOrDefaultAsync(
                 b => b.Id == request.BezirkId,
+                "",
                 cancellationToken);
 
             if (bezirk == null)
@@ -60,8 +61,9 @@ public class CreateParzelleCommandHandler : IRequestHandler<CreateParzelleComman
             }
 
             // Check if Parzelle with same number already exists in this Bezirk
-            var existingParzelle = await _parzelleRepository.FirstOrDefaultAsync(
+            var existingParzelle = await _parzelleRepository.GetFirstOrDefaultAsync(
                 p => p.BezirkId == request.BezirkId && p.Nummer.ToUpper() == request.Nummer.Trim().ToUpper(),
+                "",
                 cancellationToken);
 
             if (existingParzelle != null)
@@ -94,15 +96,15 @@ public class CreateParzelleCommandHandler : IRequestHandler<CreateParzelleComman
 
             // Update Bezirk plot count
             bezirk.IncrementPlotCount();
-            _bezirkRepository.Update(bezirk);
+            await _bezirkRepository.UpdateAsync(bezirk, cancellationToken);
 
             // Save changes
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Load the created Parzelle with Bezirk for mapping
-            var createdParzelle = await _parzelleRepository.FirstOrDefaultAsync(
+            var createdParzelle = await _parzelleRepository.GetFirstOrDefaultAsync(
                 p => p.Id == parzelle.Id,
-                p => p.Bezirk,
+                "Bezirk",
                 cancellationToken);
 
             // Map to DTO

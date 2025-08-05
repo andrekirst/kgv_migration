@@ -36,7 +36,7 @@ public class DeleteBezirkCommandHandler : IRequestHandler<DeleteBezirkCommand, R
         try
         {
             // Retrieve the Bezirk
-            var bezirk = await _bezirkRepository.FirstOrDefaultAsync(
+            var bezirk = await _bezirkRepository.GetFirstOrDefaultAsync(
                 b => b.Id == request.Id,
                 cancellationToken);
 
@@ -47,7 +47,7 @@ public class DeleteBezirkCommandHandler : IRequestHandler<DeleteBezirkCommand, R
             }
 
             // Check if there are associated Parzellen
-            var hasActiveParzellen = await _parzelleRepository.AnyAsync(
+            var hasActiveParzellen = await _parzelleRepository.ExistsAsync(
                 p => p.BezirkId == request.Id,
                 cancellationToken);
 
@@ -70,7 +70,7 @@ public class DeleteBezirkCommandHandler : IRequestHandler<DeleteBezirkCommand, R
                     bezirk.SetUpdatedBy(request.DeletedBy);
                 }
 
-                _bezirkRepository.Update(bezirk);
+                await _bezirkRepository.UpdateAsync(bezirk, cancellationToken);
                 
                 _logger.LogInformation("Successfully archived Bezirk {BezirkId}", bezirk.Id);
             }

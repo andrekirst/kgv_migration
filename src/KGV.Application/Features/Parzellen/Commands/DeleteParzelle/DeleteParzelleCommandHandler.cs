@@ -40,9 +40,9 @@ public class DeleteParzelleCommandHandler : IRequestHandler<DeleteParzelleComman
         try
         {
             // Retrieve the Parzelle with Bezirk
-            var parzelle = await _parzelleRepository.FirstOrDefaultAsync(
+            var parzelle = await _parzelleRepository.GetFirstOrDefaultAsync(
                 p => p.Id == request.Id,
-                p => p.Bezirk,
+                "Bezirk",
                 cancellationToken);
 
             if (parzelle == null)
@@ -97,7 +97,7 @@ public class DeleteParzelleCommandHandler : IRequestHandler<DeleteParzelleComman
                     parzelle.SetUpdatedBy(request.DeletedBy);
                 }
 
-                _parzelleRepository.Update(parzelle);
+                await _parzelleRepository.UpdateAsync(parzelle, cancellationToken);
                 
                 _logger.LogInformation("Successfully decommissioned Parzelle {ParzelleId} ({FullDisplayName})", 
                     parzelle.Id, parzelle.GetFullDisplayName());
@@ -113,7 +113,7 @@ public class DeleteParzelleCommandHandler : IRequestHandler<DeleteParzelleComman
                 if (parzelle.Bezirk != null)
                 {
                     parzelle.Bezirk.DecrementPlotCount();
-                    _bezirkRepository.Update(parzelle.Bezirk);
+                    await _bezirkRepository.UpdateAsync(parzelle.Bezirk, cancellationToken);
                 }
                 
                 _logger.LogInformation("Successfully deleted Parzelle {ParzelleId} ({FullDisplayName})", 
@@ -170,6 +170,8 @@ public class DeleteParzelleCommandHandler : IRequestHandler<DeleteParzelleComman
                      p.Id != parzelle.Id &&
                      p.Status == ParzellenStatus.Available &&
                      Math.Abs(p.Flaeche - parzelle.Flaeche) <= 100, // Similar size (within 100 m²)
+                null,
+                "",
                 cancellationToken);
 
             var bestAlternative = alternativePlots
@@ -196,7 +198,7 @@ public class DeleteParzelleCommandHandler : IRequestHandler<DeleteParzelleComman
                 bestAlternative.SetUpdatedBy(deletedBy);
             }
 
-            _parzelleRepository.Update(bestAlternative);
+            await _parzelleRepository.UpdateAsync(bestAlternative, cancellationToken);
 
             _logger.LogInformation("Transferred assignment from Parzelle {OldParzelleId} to {NewParzelleId}", 
                 parzelle.Id, bestAlternative.Id);

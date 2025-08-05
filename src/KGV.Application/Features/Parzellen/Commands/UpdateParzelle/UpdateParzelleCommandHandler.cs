@@ -38,9 +38,9 @@ public class UpdateParzelleCommandHandler : IRequestHandler<UpdateParzelleComman
         try
         {
             // Retrieve the existing Parzelle with Bezirk
-            var parzelle = await _parzelleRepository.FirstOrDefaultAsync(
+            var parzelle = await _parzelleRepository.GetFirstOrDefaultAsync(
                 p => p.Id == request.Id,
-                p => p.Bezirk,
+                "Bezirk",
                 cancellationToken);
 
             if (parzelle == null)
@@ -69,7 +69,7 @@ public class UpdateParzelleCommandHandler : IRequestHandler<UpdateParzelleComman
             }
 
             // Update repository
-            _parzelleRepository.Update(parzelle);
+            await _parzelleRepository.UpdateAsync(parzelle, cancellationToken);
 
             // Save changes
             await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -38,8 +38,9 @@ public class CreateBezirkCommandHandler : IRequestHandler<CreateBezirkCommand, R
         try
         {
             // Check if Bezirk with same name already exists
-            var existingBezirk = await _bezirkRepository.FirstOrDefaultAsync(
+            var existingBezirk = await _bezirkRepository.GetFirstOrDefaultAsync(
                 b => b.Name.ToUpper() == request.Name.Trim().ToUpper(),
+                "",
                 cancellationToken);
 
             if (existingBezirk != null)
