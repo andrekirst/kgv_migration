@@ -81,9 +81,9 @@ namespace KGV.Infrastructure.Patterns.Caching
     }
 
     /// <summary>
-    /// Cache configuration for different entity types
+    /// Cache configuration settings for different entity types
     /// </summary>
-    public class CacheConfiguration
+    public class CacheSettings
     {
         public string KeyPrefix { get; set; }
         public TimeSpan DefaultExpiration { get; set; }

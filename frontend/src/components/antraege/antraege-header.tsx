@@ -58,7 +58,7 @@ export function AntraegeHeader() {
         
         {/* New application button */}
         <Button asChild>
-          <Link href="/antraege/neu">
+          <Link href="/antraege/neu" className="flex items-center gap-2">
             <PlusIcon className="h-4 w-4" />
             Neuer Antrag
           </Link>

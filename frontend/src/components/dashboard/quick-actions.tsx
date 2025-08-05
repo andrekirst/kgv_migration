@@ -125,14 +125,10 @@ export function QuickActions() {
             </div>
             <div className="flex space-x-3">
               <Button variant="outline" size="sm" asChild>
-                <Link href="/hilfe">
-                  Dokumentation
-                </Link>
+                <Link href="/hilfe">Dokumentation</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/support">
-                  Support
-                </Link>
+                <Link href="/support">Support</Link>
               </Button>
             </div>
           </div>

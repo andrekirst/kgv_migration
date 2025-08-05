@@ -26,6 +26,7 @@ COPY --chown=dotnet:dotnet src/ ./src/
 
 # Build the application
 WORKDIR /app/src/KGV.API
+RUN dotnet restore ../KGV.sln
 RUN dotnet build -c Release --no-restore
 
 # Publish the application

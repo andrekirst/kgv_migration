@@ -13,7 +13,7 @@ namespace KGV.Infrastructure.Patterns.Caching
     /// Application-specific cache service implementing Cache-Aside pattern
     /// Provides high-level caching operations for KGV Application entities
     /// </summary>
-    public class ApplicationCacheService : ITypedCacheService<Application>
+    public class ApplicationCacheService : ITypedCacheService<AntiCorruption.ModernModels.Application>
     {
         private readonly ICacheService _cacheService;
         private readonly ICacheKeyBuilder _keyBuilder;
@@ -32,27 +32,27 @@ namespace KGV.Infrastructure.Patterns.Caching
             _invalidationStrategy = invalidationStrategy ?? throw new ArgumentNullException(nameof(invalidationStrategy));
         }
 
-        public async Task<Application> GetAsync(string key, CancellationToken cancellationToken = default)
+        public async Task<AntiCorruption.ModernModels.Application> GetAsync(string key, CancellationToken cancellationToken = default)
         {
-            var cacheKey = _keyBuilder.BuildKey<Application>(key);
-            return await _cacheService.GetAsync<Application>(cacheKey, cancellationToken);
+            var cacheKey = _keyBuilder.BuildKey<AntiCorruption.ModernModels.Application>(key);
+            return await _cacheService.GetAsync<AntiCorruption.ModernModels.Application>(cacheKey, cancellationToken);
         }
 
-        public async Task SetAsync(string key, Application value, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
+        public async Task SetAsync(string key, AntiCorruption.ModernModels.Application value, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
         {
-            var cacheKey = _keyBuilder.BuildKey<Application>(key);
+            var cacheKey = _keyBuilder.BuildKey<AntiCorruption.ModernModels.Application>(key);
             await _cacheService.SetAsync(cacheKey, value, expiration, cancellationToken);
         }
 
-        public async Task<Application> GetOrSetAsync(string key, Func<Task<Application>> factory, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
+        public async Task<AntiCorruption.ModernModels.Application> GetOrSetAsync(string key, Func<Task<AntiCorruption.ModernModels.Application>> factory, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
         {
-            var cacheKey = _keyBuilder.BuildKey<Application>(key);
+            var cacheKey = _keyBuilder.BuildKey<AntiCorruption.ModernModels.Application>(key);
             return await _cacheService.GetOrSetAsync(cacheKey, factory, expiration, cancellationToken);
         }
 
         public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
         {
-            var cacheKey = _keyBuilder.BuildKey<Application>(key);
+            var cacheKey = _keyBuilder.BuildKey<AntiCorruption.ModernModels.Application>(key);
             await _cacheService.RemoveAsync(cacheKey, cancellationToken);
         }
 
@@ -64,7 +64,7 @@ namespace KGV.Infrastructure.Patterns.Caching
 
         public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
         {
-            var cacheKey = _keyBuilder.BuildKey<Application>(key);
+            var cacheKey = _keyBuilder.BuildKey<AntiCorruption.ModernModels.Application>(key);
             return await _cacheService.ExistsAsync(cacheKey, cancellationToken);
         }
 
@@ -73,7 +73,7 @@ namespace KGV.Infrastructure.Patterns.Caching
         /// <summary>
         /// Cache application by ID with optimized expiration
         /// </summary>
-        public async Task<Application> GetApplicationByIdAsync(Guid applicationId, Func<Task<Application>> factory = null, CancellationToken cancellationToken = default)
+        public async Task<AntiCorruption.ModernModels.Application> GetApplicationByIdAsync(Guid applicationId, Func<Task<AntiCorruption.ModernModels.Application>> factory = null, CancellationToken cancellationToken = default)
         {
             var key = applicationId.ToString();
             
@@ -88,7 +88,7 @@ namespace KGV.Infrastructure.Patterns.Caching
         /// <summary>
         /// Cache application by file reference
         /// </summary>
-        public async Task<Application> GetApplicationByFileReferenceAsync(string fileReference, Func<Task<Application>> factory = null, CancellationToken cancellationToken = default)
+        public async Task<AntiCorruption.ModernModels.Application> GetApplicationByFileReferenceAsync(string fileReference, Func<Task<AntiCorruption.ModernModels.Application>> factory = null, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(fileReference))
                 return null;
@@ -100,7 +100,7 @@ namespace KGV.Infrastructure.Patterns.Caching
                 return await _cacheService.GetOrSetAsync(key, factory, TimeSpan.FromMinutes(30), cancellationToken);
             }
             
-            return await _cacheService.GetAsync<Application>(key, cancellationToken);
+            return await _cacheService.GetAsync<AntiCorruption.ModernModels.Application>(key, cancellationToken);
         }
 
         /// <summary>
@@ -242,7 +242,7 @@ namespace KGV.Infrastructure.Patterns.Caching
         /// <summary>
         /// Warm up cache with frequently accessed applications
         /// </summary>
-        public async Task WarmUpCacheAsync(IEnumerable<Guid> applicationIds, Func<Guid, Task<Application>> factory, CancellationToken cancellationToken = default)
+        public async Task WarmUpCacheAsync(IEnumerable<Guid> applicationIds, Func<Guid, Task<AntiCorruption.ModernModels.Application>> factory, CancellationToken cancellationToken = default)
         {
             if (factory == null || applicationIds == null)
                 return;

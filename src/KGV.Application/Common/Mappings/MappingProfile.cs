@@ -25,7 +25,7 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.VollName, opt => opt.MapFrom(src => src.GetFullName()))
             .ForMember(dest => dest.VollName2, opt => opt.MapFrom(src => src.GetSecondaryFullName()))
             .ForMember(dest => dest.VollAdresse, opt => opt.MapFrom(src => src.Adresse != null ? src.Adresse.GetFullAddress() : null))
-            .ForMember(dest => dest.AktenzeichenValue, opt => opt.MapFrom(src => src.AktenzeichenValue))
+            .ForMember(dest => dest.Aktenzeichen, opt => opt.MapFrom(src => src.AktenzeichenValue))
             .ForMember(dest => dest.Verlauf, opt => opt.MapFrom(src => src.Verlauf));
 
         CreateMap<Antrag, AntragListDto>()

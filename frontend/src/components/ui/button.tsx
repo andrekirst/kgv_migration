@@ -59,6 +59,28 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     
     const isDisabled = disabled || loading
     
+    // When using asChild, we need to be careful with props to avoid React.Children.only errors
+    if (asChild) {
+      // Filter out button-specific props that might cause issues with non-button elements
+      const { 
+        type, 
+        disabled: _, 
+        'aria-disabled': __, 
+        ...filteredProps 
+      } = props
+      
+      return (
+        <Comp
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...filteredProps}
+          {...(isDisabled && { 'aria-disabled': true })}
+        >
+          {children}
+        </Comp>
+      )
+    }
+
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}

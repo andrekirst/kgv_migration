@@ -228,15 +228,7 @@ public static class ServiceCollectionExtensions
                 tags: new[] { "ready", "database" });
         }
 
-        // Redis health check (if configured)
-        var redisConnectionString = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrEmpty(redisConnectionString))
-        {
-            healthChecksBuilder.AddRedis(
-                redisConnectionString,
-                name: "redis",
-                tags: new[] { "ready", "cache" });
-        }
+        // Redis health check is handled by Infrastructure layer
 
         return services;
     }

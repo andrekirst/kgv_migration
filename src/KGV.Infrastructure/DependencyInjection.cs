@@ -81,16 +81,7 @@ public static class DependencyInjection
             failureStatus: HealthStatus.Unhealthy,
             tags: new[] { "db", "ready" });
 
-        // Redis health check (if configured)
-        var redisConnectionString = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrEmpty(redisConnectionString))
-        {
-            healthChecksBuilder.AddRedis(
-                redisConnectionString,
-                name: "redis",
-                failureStatus: HealthStatus.Degraded,
-                tags: new[] { "cache", "ready" });
-        }
+        // Redis health check is handled by CacheConfiguration
     }
 
     /// <summary>

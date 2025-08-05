@@ -13,6 +13,7 @@ public class UnitOfWork : IUnitOfWork
 {
     private readonly KgvDbContext _context;
     private readonly ILogger<UnitOfWork> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private IDbContextTransaction? _transaction;
     private bool _disposed = false;
 
@@ -25,10 +26,11 @@ public class UnitOfWork : IUnitOfWork
     private IRepository<Person>? _personen;
     private IRepository<Verlauf>? _verlaufe;
 
-    public UnitOfWork(KgvDbContext context, ILogger<UnitOfWork> logger)
+    public UnitOfWork(KgvDbContext context, ILogger<UnitOfWork> logger, ILoggerFactory loggerFactory)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
     }
 
     public IRepository<Antrag> Antraege
@@ -36,7 +38,7 @@ public class UnitOfWork : IUnitOfWork
         get
         {
             _antraege ??= new Repository<Antrag>(_context, 
-                _logger.CreateLogger<Repository<Antrag>>());
+                _loggerFactory.CreateLogger<Repository<Antrag>>());
             return _antraege;
         }
     }
@@ -46,7 +48,7 @@ public class UnitOfWork : IUnitOfWork
         get
         {
             _bezirke ??= new Repository<Bezirk>(_context, 
-                _logger.CreateLogger<Repository<Bezirk>>());
+                _loggerFactory.CreateLogger<Repository<Bezirk>>());
             return _bezirke;
         }
     }
@@ -56,7 +58,7 @@ public class UnitOfWork : IUnitOfWork
         get
         {
             _katasterbezirke ??= new Repository<Katasterbezirk>(_context, 
-                _logger.CreateLogger<Repository<Katasterbezirk>>());
+                _loggerFactory.CreateLogger<Repository<Katasterbezirk>>());
             return _katasterbezirke;
         }
     }
@@ -66,7 +68,7 @@ public class UnitOfWork : IUnitOfWork
         get
         {
             _aktenzeichen ??= new Repository<AktenzeichenEntity>(_context, 
-                _logger.CreateLogger<Repository<AktenzeichenEntity>>());
+                _loggerFactory.CreateLogger<Repository<AktenzeichenEntity>>());
             return _aktenzeichen;
         }
     }
@@ -76,7 +78,7 @@ public class UnitOfWork : IUnitOfWork
         get
         {
             _eingangsnummern ??= new Repository<Eingangsnummer>(_context, 
-                _logger.CreateLogger<Repository<Eingangsnummer>>());
+                _loggerFactory.CreateLogger<Repository<Eingangsnummer>>());
             return _eingangsnummern;
         }
     }
@@ -86,7 +88,7 @@ public class UnitOfWork : IUnitOfWork
         get
         {
             _personen ??= new Repository<Person>(_context, 
-                _logger.CreateLogger<Repository<Person>>());
+                _loggerFactory.CreateLogger<Repository<Person>>());
             return _personen;
         }
     }
@@ -96,7 +98,7 @@ public class UnitOfWork : IUnitOfWork
         get
         {
             _verlaufe ??= new Repository<Verlauf>(_context, 
-                _logger.CreateLogger<Repository<Verlauf>>());
+                _loggerFactory.CreateLogger<Repository<Verlauf>>());
             return _verlaufe;
         }
     }

@@ -69,7 +69,7 @@ namespace KGV.Infrastructure.Patterns.CQRS.Commands
                 }
 
                 // Create new application
-                var application = new Application
+                var application = new AntiCorruption.ModernModels.Application
                 {
                     Id = Guid.NewGuid(),
                     FileReference = command.FileReference,
@@ -556,10 +556,10 @@ namespace KGV.Infrastructure.Patterns.CQRS.Commands
 
     public interface IApplicationRepository
     {
-        Task<Application> GetByIdAsync(Guid id);
-        Task<Application> GetByFileReferenceAsync(string fileReference);
-        Task AddAsync(Application application);
-        Task UpdateAsync(Application application);
+        Task<AntiCorruption.ModernModels.Application> GetByIdAsync(Guid id);
+        Task<AntiCorruption.ModernModels.Application> GetByFileReferenceAsync(string fileReference);
+        Task AddAsync(AntiCorruption.ModernModels.Application application);
+        Task UpdateAsync(AntiCorruption.ModernModels.Application application);
         Task DeleteAsync(Guid id);
     }
 

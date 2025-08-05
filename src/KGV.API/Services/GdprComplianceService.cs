@@ -72,30 +72,30 @@ public class GdprComplianceService : IGdprComplianceService
             {
                 export.DataCategories["PersonalInformation"] = new
                 {
-                    person.Vorname,
-                    person.Nachname,
-                    person.Email?.Value,
-                    person.Telefon?.Value,
-                    person.CreatedAt,
-                    person.UpdatedAt
+                    FirstName = person.Vorname,
+                    LastName = person.Nachname,
+                    Email = person.Email?.Value,
+                    Phone = person.Telefon?.Value,
+                    CreatedAt = person.CreatedAt,
+                    UpdatedAt = person.UpdatedAt
                 };
             }
 
             // Export application data
             export.DataCategories["Applications"] = antraege.Select(a => new
             {
-                a.Id,
-                a.Vorname,
-                a.Nachname,
+                ApplicationId = a.Id,
+                FirstName = a.Vorname,
+                LastName = a.Nachname,
                 Address = a.Adresse?.GetFullAddress(),
-                a.EMail?.Value,
-                a.Telefon?.Value,
-                a.MobilTelefon?.Value,
-                a.Bewerbungsdatum,
-                a.Status,
-                a.Wunsch,
-                a.CreatedAt,
-                a.UpdatedAt,
+                Email = a.EMail?.Value,
+                Phone = a.Telefon?.Value,
+                MobilePhone = a.MobilTelefon?.Value,
+                ApplicationDate = a.Bewerbungsdatum,
+                Status = a.Status,
+                Wishes = a.Wunsch,
+                CreatedAt = a.CreatedAt,
+                UpdatedAt = a.UpdatedAt,
                 History = a.Verlauf.Select(v => new
                 {
                     v.Art,

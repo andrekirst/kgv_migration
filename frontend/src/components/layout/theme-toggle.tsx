@@ -4,7 +4,7 @@
 import * as React from 'react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
-import { SunIcon, MoonIcon, ComputerDesktopIcon } from 'lucide-react'
+import { Sun, Moon, Monitor } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { cn } from '@/lib/utils'
 
@@ -39,9 +39,9 @@ export function ThemeToggle() {
           className="h-8 w-8"
           aria-label="Theme wechseln"
         >
-          {theme === 'light' && <SunIcon className="h-4 w-4" />}
-          {theme === 'dark' && <MoonIcon className="h-4 w-4" />}
-          {theme === 'system' && <ComputerDesktopIcon className="h-4 w-4" />}
+          {theme === 'light' && <Sun className="h-4 w-4" />}
+          {theme === 'dark' && <Moon className="h-4 w-4" />}
+          {theme === 'system' && <Monitor className="h-4 w-4" />}
         </Button>
       </DropdownMenu.Trigger>
 
@@ -66,7 +66,7 @@ export function ThemeToggle() {
             )}
             onSelect={() => setTheme('light')}
           >
-            <SunIcon className="h-4 w-4" />
+            <Sun className="h-4 w-4" />
             <span>Hell</span>
             {theme === 'light' && (
               <div className="ml-auto h-2 w-2 rounded-full bg-primary-600" />
@@ -82,7 +82,7 @@ export function ThemeToggle() {
             )}
             onSelect={() => setTheme('dark')}
           >
-            <MoonIcon className="h-4 w-4" />
+            <Moon className="h-4 w-4" />
             <span>Dunkel</span>
             {theme === 'dark' && (
               <div className="ml-auto h-2 w-2 rounded-full bg-primary-600" />
@@ -98,7 +98,7 @@ export function ThemeToggle() {
             )}
             onSelect={() => setTheme('system')}
           >
-            <ComputerDesktopIcon className="h-4 w-4" />
+            <Monitor className="h-4 w-4" />
             <span>System</span>
             {theme === 'system' && (
               <div className="ml-auto h-2 w-2 rounded-full bg-primary-600" />

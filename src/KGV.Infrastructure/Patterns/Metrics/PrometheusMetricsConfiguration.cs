@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Prometheus;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Linq;
 
 namespace KGV.Infrastructure.Patterns.Metrics
 {
@@ -40,8 +42,8 @@ namespace KGV.Infrastructure.Patterns.Metrics
             // Add Prometheus HTTP metrics middleware
             app.UseHttpMetrics(options =>
             {
-                options.AddCustomLabel("application", "kgv-migration");
-                options.AddCustomLabel("environment", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "unknown");
+                options.AddCustomLabel("application", context => "kgv-migration");
+                options.AddCustomLabel("environment", context => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "unknown");
             });
 
             // Expose metrics endpoint
@@ -58,129 +60,129 @@ namespace KGV.Infrastructure.Patterns.Metrics
     public class KgvMetrics
     {
         // Application metrics
-        public static readonly Counter ApplicationsCreated = Metrics
+        public static readonly Counter ApplicationsCreated = Prometheus.Metrics
             .CreateCounter("kgv_applications_created_total", "Total number of applications created",
-                new[] { "status", "district" });
+                labelNames: new[] { "status", "district" });
 
-        public static readonly Counter ApplicationsUpdated = Metrics
+        public static readonly Counter ApplicationsUpdated = Prometheus.Metrics
             .CreateCounter("kgv_applications_updated_total", "Total number of applications updated",
-                new[] { "change_type", "district" });
+                labelNames: new[] { "change_type", "district" });
 
-        public static readonly Gauge ApplicationsActive = Metrics
+        public static readonly Gauge ApplicationsActive = Prometheus.Metrics
             .CreateGauge("kgv_applications_active", "Number of active applications",
-                new[] { "status", "district" });
+                labelNames: new[] { "status", "district" });
 
-        public static readonly Histogram ApplicationProcessingDuration = Metrics
+        public static readonly Histogram ApplicationProcessingDuration = Prometheus.Metrics
             .CreateHistogram("kgv_application_processing_duration_seconds", 
                 "Time spent processing applications",
-                new[] { "operation", "status" });
+                labelNames: new[] { "operation", "status" });
 
         // Cache metrics
-        public static readonly Counter CacheOperations = Metrics
+        public static readonly Counter CacheOperations = Prometheus.Metrics
             .CreateCounter("kgv_cache_operations_total", "Total cache operations",
-                new[] { "operation", "entity_type", "result" });
+                labelNames: new[] { "operation", "entity_type", "result" });
 
-        public static readonly Histogram CacheOperationDuration = Metrics
+        public static readonly Histogram CacheOperationDuration = Prometheus.Metrics
             .CreateHistogram("kgv_cache_operation_duration_seconds", "Cache operation duration",
-                new[] { "operation", "entity_type" });
+                labelNames: new[] { "operation", "entity_type" });
 
-        public static readonly Gauge CacheHitRatio = Metrics
+        public static readonly Gauge CacheHitRatio = Prometheus.Metrics
             .CreateGauge("kgv_cache_hit_ratio", "Cache hit ratio",
-                new[] { "entity_type" });
+                labelNames: new[] { "entity_type" });
 
-        public static readonly Gauge CacheSize = Metrics
+        public static readonly Gauge CacheSize = Prometheus.Metrics
             .CreateGauge("kgv_cache_size_bytes", "Cache size in bytes",
-                new[] { "entity_type" });
+                labelNames: new[] { "entity_type" });
 
         // Message queue metrics
-        public static readonly Counter MessagesProcessed = Metrics
+        public static readonly Counter MessagesProcessed = Prometheus.Metrics
             .CreateCounter("kgv_messages_processed_total", "Total messages processed",
-                new[] { "queue", "status", "consumer" });
+                labelNames: new[] { "queue", "status", "consumer" });
 
-        public static readonly Gauge QueueLength = Metrics
+        public static readonly Gauge QueueLength = Prometheus.Metrics
             .CreateGauge("kgv_queue_length", "Number of messages in queue",
-                new[] { "queue", "priority" });
+                labelNames: new[] { "queue", "priority" });
 
-        public static readonly Histogram MessageProcessingDuration = Metrics
+        public static readonly Histogram MessageProcessingDuration = Prometheus.Metrics
             .CreateHistogram("kgv_message_processing_duration_seconds", "Message processing duration",
-                new[] { "queue", "consumer" });
+                labelNames: new[] { "queue", "consumer" });
 
-        public static readonly Gauge DeadLetterQueueLength = Metrics
+        public static readonly Gauge DeadLetterQueueLength = Prometheus.Metrics
             .CreateGauge("kgv_dead_letter_queue_length", "Number of messages in dead letter queue",
-                new[] { "queue" });
+                labelNames: new[] { "queue" });
 
         // Database metrics
-        public static readonly Counter DatabaseOperations = Metrics
+        public static readonly Counter DatabaseOperations = Prometheus.Metrics
             .CreateCounter("kgv_database_operations_total", "Total database operations",
-                new[] { "operation", "table", "result" });
+                labelNames: new[] { "operation", "table", "result" });
 
-        public static readonly Histogram DatabaseOperationDuration = Metrics
+        public static readonly Histogram DatabaseOperationDuration = Prometheus.Metrics
             .CreateHistogram("kgv_database_operation_duration_seconds", "Database operation duration",
-                new[] { "operation", "table" });
+                labelNames: new[] { "operation", "table" });
 
-        public static readonly Gauge DatabaseConnections = Metrics
+        public static readonly Gauge DatabaseConnections = Prometheus.Metrics
             .CreateGauge("kgv_database_connections", "Number of database connections",
-                new[] { "database", "state" });
+                labelNames: new[] { "database", "state" });
 
         // Migration metrics
-        public static readonly Counter MigrationRecordsProcessed = Metrics
+        public static readonly Counter MigrationRecordsProcessed = Prometheus.Metrics
             .CreateCounter("kgv_migration_records_processed_total", "Total migration records processed",
-                new[] { "source", "target", "status" });
+                labelNames: new[] { "source", "target", "status" });
 
-        public static readonly Gauge MigrationProgress = Metrics
+        public static readonly Gauge MigrationProgress = Prometheus.Metrics
             .CreateGauge("kgv_migration_progress_percent", "Migration progress percentage",
-                new[] { "migration_type" });
+                labelNames: new[] { "migration_type" });
 
-        public static readonly Histogram MigrationBatchDuration = Metrics
+        public static readonly Histogram MigrationBatchDuration = Prometheus.Metrics
             .CreateHistogram("kgv_migration_batch_duration_seconds", "Migration batch processing duration",
-                new[] { "migration_type", "batch_size" });
+                labelNames: new[] { "migration_type", "batch_size" });
 
         // Health check metrics
-        public static readonly Gauge HealthCheckStatus = Metrics
+        public static readonly Gauge HealthCheckStatus = Prometheus.Metrics
             .CreateGauge("kgv_health_check_status", "Health check status (1=healthy, 0=unhealthy)",
-                new[] { "check_name" });
+                labelNames: new[] { "check_name" });
 
-        public static readonly Histogram HealthCheckDuration = Metrics
+        public static readonly Histogram HealthCheckDuration = Prometheus.Metrics
             .CreateHistogram("kgv_health_check_duration_seconds", "Health check duration",
-                new[] { "check_name" });
+                labelNames: new[] { "check_name" });
 
         // Performance metrics
-        public static readonly Histogram HttpRequestDuration = Metrics
+        public static readonly Histogram HttpRequestDuration = Prometheus.Metrics
             .CreateHistogram("kgv_http_request_duration_seconds", "HTTP request duration",
-                new[] { "method", "endpoint", "status_code" });
+                labelNames: new[] { "method", "endpoint", "status_code" });
 
-        public static readonly Counter HttpRequests = Metrics
+        public static readonly Counter HttpRequests = Prometheus.Metrics
             .CreateCounter("kgv_http_requests_total", "Total HTTP requests",
-                new[] { "method", "endpoint", "status_code" });
+                labelNames: new[] { "method", "endpoint", "status_code" });
 
-        public static readonly Gauge MemoryUsage = Metrics
+        public static readonly Gauge MemoryUsage = Prometheus.Metrics
             .CreateGauge("kgv_memory_usage_bytes", "Memory usage in bytes",
-                new[] { "type" });
+                labelNames: new[] { "type" });
 
-        public static readonly Gauge CpuUsage = Metrics
+        public static readonly Gauge CpuUsage = Prometheus.Metrics
             .CreateGauge("kgv_cpu_usage_percent", "CPU usage percentage");
 
         // Error metrics
-        public static readonly Counter Errors = Metrics
+        public static readonly Counter Errors = Prometheus.Metrics
             .CreateCounter("kgv_errors_total", "Total errors",
-                new[] { "component", "error_type", "severity" });
+                labelNames: new[] { "component", "error_type", "severity" });
 
-        public static readonly Gauge ErrorRate = Metrics
+        public static readonly Gauge ErrorRate = Prometheus.Metrics
             .CreateGauge("kgv_error_rate", "Error rate per minute",
-                new[] { "component" });
+                labelNames: new[] { "component" });
 
         // Business metrics
-        public static readonly Gauge ApplicationBacklog = Metrics
+        public static readonly Gauge ApplicationBacklog = Prometheus.Metrics
             .CreateGauge("kgv_application_backlog", "Number of applications waiting for processing",
-                new[] { "status", "priority" });
+                labelNames: new[] { "status", "priority" });
 
-        public static readonly Histogram ApplicationLifecycle = Metrics
+        public static readonly Histogram ApplicationLifecycle = Prometheus.Metrics
             .CreateHistogram("kgv_application_lifecycle_duration_days", "Application lifecycle duration",
-                new[] { "from_status", "to_status" });
+                labelNames: new[] { "from_status", "to_status" });
 
-        public static readonly Counter UserActions = Metrics
+        public static readonly Counter UserActions = Prometheus.Metrics
             .CreateCounter("kgv_user_actions_total", "Total user actions",
-                new[] { "action", "user_role" });
+                labelNames: new[] { "action", "user_role" });
     }
 
     /// <summary>

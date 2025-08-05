@@ -27,7 +27,7 @@ export function UserMenu() {
 
   const handleLogout = () => {
     // Implement logout logic
-    console.log('Logout clicked')
+    // TODO: Add proper logout implementation
   }
 
   return (

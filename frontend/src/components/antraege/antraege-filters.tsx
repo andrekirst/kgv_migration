@@ -121,13 +121,13 @@ export function AntraegeFilters() {
     filters.dateTo
   
   const activeFilterCount = [
-    filters.search && 1,
+    filters.search ? 1 : 0,
     filters.status.length,
     filters.bezirk.length,
-    filters.aktiv !== null && 1,
-    filters.dateFrom && 1,
-    filters.dateTo && 1,
-  ].filter(Boolean).reduce((sum, count) => sum + (count as number), 0)
+    filters.aktiv !== null ? 1 : 0,
+    filters.dateFrom ? 1 : 0,
+    filters.dateTo ? 1 : 0,
+  ].reduce((sum, count) => sum + count, 0)
   
   return (
     <Card>

@@ -17,7 +17,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
             IConfiguration configuration)
         {
             // Register core translator services
-            services.AddScoped<ILegacyDataTranslator<LegacyAntrag, Application>, AntragTranslator>();
+            services.AddScoped<ILegacyDataTranslator<LegacyAntrag, ModernModels.Application>, AntragTranslator>();
             services.AddScoped<ILegacyDataTranslator<LegacyPerson, Person>, PersonTranslator>();
             services.AddScoped<ILegacyDataTranslator<LegacyBezirk, District>, BezirkTranslator>();
             services.AddScoped<ILegacyDataTranslator<LegacyVerlauf, ApplicationHistory>, VerlaufTranslator>();
@@ -50,18 +50,18 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
     /// </summary>
     public interface ILegacyDataFacade
     {
-        Task<Application> GetModernApplicationAsync(Guid legacyId);
+        Task<ModernModels.Application> GetModernApplicationAsync(Guid legacyId);
         Task<Person> GetModernPersonAsync(Guid legacyId);
         Task<District> GetModernDistrictAsync(Guid legacyId);
-        Task<IEnumerable<Application>> GetModernApplicationsBatchAsync(IEnumerable<Guid> legacyIds);
-        Task<bool> SyncApplicationToLegacyAsync(Application modernApplication);
+        Task<IEnumerable<ModernModels.Application>> GetModernApplicationsBatchAsync(IEnumerable<Guid> legacyIds);
+        Task<bool> SyncApplicationToLegacyAsync(ModernModels.Application modernApplication);
         Task<DataMigrationSummary> MigrateAllDataAsync();
     }
 
     public class LegacyDataFacade : ILegacyDataFacade
     {
         private readonly ILegacyDataRepository _legacyRepository;
-        private readonly ILegacyDataTranslator<LegacyAntrag, Application> _antragTranslator;
+        private readonly ILegacyDataTranslator<LegacyAntrag, ModernModels.Application> _antragTranslator;
         private readonly ILegacyDataTranslator<LegacyPerson, Person> _personTranslator;
         private readonly ILegacyDataTranslator<LegacyBezirk, District> _bezirkTranslator;
         private readonly ILegacyDataTranslator<LegacyVerlauf, ApplicationHistory> _verlaufTranslator;
@@ -70,7 +70,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
 
         public LegacyDataFacade(
             ILegacyDataRepository legacyRepository,
-            ILegacyDataTranslator<LegacyAntrag, Application> antragTranslator,
+            ILegacyDataTranslator<LegacyAntrag, ModernModels.Application> antragTranslator,
             ILegacyDataTranslator<LegacyPerson, Person> personTranslator,
             ILegacyDataTranslator<LegacyBezirk, District> bezirkTranslator,
             ILegacyDataTranslator<LegacyVerlauf, ApplicationHistory> verlaufTranslator,
@@ -86,7 +86,7 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
             _logger = logger;
         }
 
-        public async Task<Application> GetModernApplicationAsync(Guid legacyId)
+        public async Task<ModernModels.Application> GetModernApplicationAsync(Guid legacyId)
         {
             var legacyAntrag = await _legacyRepository.GetAntragAsync(legacyId);
             if (legacyAntrag == null)
@@ -136,13 +136,13 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
             return await _bezirkTranslator.TranslateToModernAsync(legacyBezirk);
         }
 
-        public async Task<IEnumerable<Application>> GetModernApplicationsBatchAsync(IEnumerable<Guid> legacyIds)
+        public async Task<IEnumerable<ModernModels.Application>> GetModernApplicationsBatchAsync(IEnumerable<Guid> legacyIds)
         {
             var legacyAntraege = await _legacyRepository.GetAntraegeBatchAsync(legacyIds);
             return await _antragTranslator.TranslateBatchToModernAsync(legacyAntraege);
         }
 
-        public async Task<bool> SyncApplicationToLegacyAsync(Application modernApplication)
+        public async Task<bool> SyncApplicationToLegacyAsync(ModernModels.Application modernApplication)
         {
             try
             {
@@ -294,4 +294,10 @@ namespace KGV.Infrastructure.Patterns.AntiCorruption
         public Task<LegacyPerson> GetPersonAsync(Guid id) => throw new NotImplementedException();
         public Task<LegacyBezirk> GetBezirkAsync(Guid id) => throw new NotImplementedException();
         public Task<IEnumerable<LegacyVerlauf>> GetVerlaufByAntragIdAsync(Guid antragId) => throw new NotImplementedException();
-        public Task<IEnu
+        public Task<IEnumerable<LegacyAntrag>> GetAntraegeBatchAsync(IEnumerable<Guid> ids) => throw new NotImplementedException();
+        public Task<IEnumerable<LegacyAntrag>> GetAllAntraegeAsync() => throw new NotImplementedException();
+        public Task<IEnumerable<LegacyPerson>> GetAllPersonsAsync() => throw new NotImplementedException();
+        public Task<IEnumerable<LegacyBezirk>> GetAllBezirkeAsync() => throw new NotImplementedException();
+        public Task<bool> UpdateAntragAsync(LegacyAntrag antrag) => throw new NotImplementedException();
+    }
+}

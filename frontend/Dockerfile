@@ -1,10 +1,10 @@
-# Multi-stage Dockerfile for Next.js 14 KGV Frontend
+# Multi-stage Dockerfile for Next.js 15 KGV Frontend
 # Optimized for production deployment with minimal image size
 
 # ===========================
 # Stage 1: Dependencies
 # ===========================
-FROM node:18-alpine AS deps
+FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
@@ -18,7 +18,7 @@ RUN npm ci --only=production --ignore-scripts
 # ===========================
 # Stage 2: Builder
 # ===========================
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
@@ -46,7 +46,7 @@ RUN npm run build
 # ===========================
 # Stage 3: Runner (Production)
 # ===========================
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
@@ -93,7 +93,7 @@ CMD ["node", "server.js"]
 # ===========================
 # Stage 4: Development (Optional)
 # ===========================
-FROM node:18-alpine AS development
+FROM node:20-alpine AS development
 
 WORKDIR /app
 
@@ -112,9 +112,11 @@ COPY . .
 # Environment variables for development
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3001
 
 # Start development server
 CMD ["npm", "run", "dev"]

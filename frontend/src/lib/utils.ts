@@ -166,7 +166,7 @@ export function sleep(ms: number): Promise<void> {
 /**
  * Debounce function
  */
-export function debounce<T extends (...args: unknown[]) => void>(
+export function debounce<T extends (...args: any[]) => void>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {

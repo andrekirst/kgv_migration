@@ -278,9 +278,7 @@ export function RecentActivity() {
               Aktualisiert vor wenigen Minuten
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/aktivitaeten">
-                Alle Aktivitäten
-              </Link>
+              <Link href="/aktivitaeten">Alle Aktivitäten</Link>
             </Button>
           </div>
         </div>

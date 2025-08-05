@@ -5,6 +5,8 @@ import { AntraegeList } from '@/components/antraege/antraege-list'
 import { AntraegeHeader } from '@/components/antraege/antraege-header'
 import { AntraegeFilters } from '@/components/antraege/antraege-filters'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Anträge',
   description: 'Verwaltung aller Kleingartenanträge - Suchen, Filtern und Bearbeiten von Anträgen',

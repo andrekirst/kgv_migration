@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.IO;
+using System.Linq;
+using System.Threading;
 
 namespace KGV.Infrastructure.Patterns.HealthChecks
 {
@@ -41,17 +44,7 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
                     tags: new[] { "database", "sqlserver", "legacy", "ready" });
             }
 
-            // Redis cache health check
-            var redisConnection = configuration.GetConnectionString("Redis") ?? 
-                                configuration.GetSection("Caching:Redis:ConnectionString").Value;
-            if (!string.IsNullOrEmpty(redisConnection))
-            {
-                healthChecksBuilder.AddRedis(
-                    redisConnectionString: redisConnection,
-                    name: "redis-cache",
-                    failureStatus: HealthStatus.Degraded, // Cache failure shouldn't stop service
-                    tags: new[] { "cache", "redis", "ready" });
-            }
+            // Redis cache health check is handled by CacheConfiguration
 
             // Custom health checks
             healthChecksBuilder.AddCheck<ApplicationHealthCheck>(
@@ -190,12 +183,12 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
                     return HealthCheckResult.Unhealthy($"Application health issues: {errorMessages}", data: data);
                 }
 
-                return HealthCheckResult.Healthy("Application is running normally", data);
+                return HealthCheckResult.Healthy("Application is running normally", data: data);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Application health check failed");
-                return HealthCheckResult.Unhealthy($"Health check exception: {ex.Message}");
+                return HealthCheckResult.Unhealthy($"Health check exception: {ex.Message}", data: new Dictionary<string, object> { { "error", ex.Message } });
             }
         }
     }
@@ -208,11 +201,13 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
     {
         private readonly ILogger<LegacySystemHealthCheck> _logger;
         private readonly IConfiguration _configuration;
+        private readonly IServiceProvider _serviceProvider;
 
-        public LegacySystemHealthCheck(ILogger<LegacySystemHealthCheck> logger, IConfiguration configuration)
+        public LegacySystemHealthCheck(ILogger<LegacySystemHealthCheck> logger, IConfiguration configuration, IServiceProvider serviceProvider)
         {
             _logger = logger;
             _configuration = configuration;
+            _serviceProvider = serviceProvider;
         }
 
         public async Task<HealthCheckResult> CheckHealthAsync(
@@ -227,32 +222,33 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
                 if (string.IsNullOrEmpty(legacyConnectionString))
                 {
                     data.Add("legacy_configured", false);
-                    return HealthCheckResult.Degraded("Legacy database connection not configured", data);
+                    return HealthCheckResult.Degraded("Legacy database connection not configured", data: data);
                 }
 
                 data.Add("legacy_configured", true);
 
                 // Test legacy database connection
-                using var context = new AntiCorruption.LegacyDatabaseContext(legacyConnectionString, _logger);
-                var isConnected = await context.TestConnectionAsync();
+                using var legacyContext = new AntiCorruption.LegacyDatabaseContext(legacyConnectionString, 
+                    _serviceProvider?.GetService<ILogger<AntiCorruption.LegacyDatabaseContext>>());
+                var isConnected = await legacyContext.TestConnectionAsync();
 
                 data.Add("legacy_connected", isConnected);
                 data.Add("check_time", DateTime.UtcNow);
 
                 if (!isConnected)
                 {
-                    return HealthCheckResult.Degraded("Cannot connect to legacy database", data);
+                    return HealthCheckResult.Degraded("Cannot connect to legacy database", data: data);
                 }
 
                 // Additional legacy system checks could go here
                 // e.g., check specific tables, recent data, etc.
 
-                return HealthCheckResult.Healthy("Legacy system is accessible", data);
+                return HealthCheckResult.Healthy("Legacy system is accessible", data: data);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Legacy system health check failed");
-                return HealthCheckResult.Degraded($"Legacy system check error: {ex.Message}");
+                return HealthCheckResult.Degraded($"Legacy system check error: {ex.Message}", data: new Dictionary<string, object> { { "error", ex.Message } });
             }
         }
     }
@@ -303,15 +299,15 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
                 if (inconsistentChecks.Any())
                 {
                     var issues = string.Join("; ", inconsistentChecks.Select(c => c.details));
-                    return HealthCheckResult.Degraded($"Data consistency issues: {issues}", data);
+                    return HealthCheckResult.Degraded($"Data consistency issues: {issues}", data: data);
                 }
 
-                return HealthCheckResult.Healthy("Data consistency verified", data);
+                return HealthCheckResult.Healthy("Data consistency verified", data: data);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Data consistency health check failed");
-                return HealthCheckResult.Degraded($"Data consistency check error: {ex.Message}");
+                return HealthCheckResult.Degraded($"Data consistency check error: {ex.Message}", data: new Dictionary<string, object> { { "error", ex.Message } });
             }
         }
     }
@@ -364,12 +360,12 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
                 data.Add("migration_active", isEnabled);
                 data.Add("check_time", DateTime.UtcNow);
 
-                return HealthCheckResult.Healthy("Migration status reported", data);
+                return HealthCheckResult.Healthy("Migration status reported", data: data);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Migration health check failed");
-                return HealthCheckResult.Degraded($"Migration status check error: {ex.Message}");
+                return HealthCheckResult.Degraded($"Migration status check error: {ex.Message}", data: new Dictionary<string, object> { { "error", ex.Message } });
             }
         }
 
@@ -442,15 +438,15 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
 
                 if (issues.Any())
                 {
-                    return HealthCheckResult.Unhealthy($"File system issues: {string.Join("; ", issues)}", data);
+                    return HealthCheckResult.Unhealthy($"File system issues: {string.Join("; ", issues)}", data: data);
                 }
 
-                return HealthCheckResult.Healthy("File system is accessible", data);
+                return HealthCheckResult.Healthy("File system is accessible", data: data);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "File system health check failed");
-                return HealthCheckResult.Unhealthy($"File system check error: {ex.Message}");
+                return HealthCheckResult.Unhealthy($"File system check error: {ex.Message}", data: new Dictionary<string, object> { { "error", ex.Message } });
             }
         }
 
@@ -534,12 +530,12 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
                     return new HealthCheckResult(status, $"Memory issues: {string.Join("; ", issues)}", data: data);
                 }
 
-                return HealthCheckResult.Healthy("Memory usage is normal", data);
+                return HealthCheckResult.Healthy("Memory usage is normal", data: data);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Memory health check failed");
-                return HealthCheckResult.Degraded($"Memory check error: {ex.Message}");
+                return HealthCheckResult.Degraded($"Memory check error: {ex.Message}", data: new Dictionary<string, object> { { "error", ex.Message } });
             }
         }
     }
@@ -600,12 +596,12 @@ namespace KGV.Infrastructure.Patterns.HealthChecks
 
                 data.Add("container_paths", pathData);
 
-                return HealthCheckResult.Healthy("Container environment verified", data);
+                return HealthCheckResult.Healthy("Container environment verified", data: data);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Container health check failed");
-                return HealthCheckResult.Degraded($"Container check error: {ex.Message}");
+                return HealthCheckResult.Degraded($"Container check error: {ex.Message}", data: new Dictionary<string, object> { { "error", ex.Message } });
             }
         }
     }

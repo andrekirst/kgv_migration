@@ -6,6 +6,8 @@ import { RecentActivity } from '@/components/dashboard/recent-activity'
 import { QuickActions } from '@/components/dashboard/quick-actions'
 import { StatusOverview } from '@/components/dashboard/status-overview'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Dashboard',
   description: 'Übersicht über Anträge, Statistiken und aktuelle Aktivitäten im KGV-System',

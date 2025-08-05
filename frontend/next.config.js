@@ -3,12 +3,14 @@ const nextConfig = {
   // Enable experimental features
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
+  },
+
+  // Turbopack configuration (moved from experimental.turbo)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
       },
     },
   },
@@ -30,10 +32,8 @@ const nextConfig = {
   },
 
   // Internationalization
-  i18n: {
-    locales: ['de'],
-    defaultLocale: 'de',
-  },
+  // i18n configuration removed - not supported in App Router
+  // Use next-intl or similar for App Router internationalization
 
   // Performance optimizations
   compress: true,

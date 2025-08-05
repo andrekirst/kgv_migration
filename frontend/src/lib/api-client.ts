@@ -112,7 +112,7 @@ class ApiClient {
     return this.request<T>(endpoint, {
       ...config,
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : null,
     })
   }
 
@@ -121,7 +121,7 @@ class ApiClient {
     return this.request<T>(endpoint, {
       ...config,
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : null,
     })
   }
 
@@ -130,7 +130,7 @@ class ApiClient {
     return this.request<T>(endpoint, {
       ...config,
       method: 'PATCH',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : null,
     })
   }
 
