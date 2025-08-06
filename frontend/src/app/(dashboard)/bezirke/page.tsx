@@ -306,20 +306,20 @@ async function BezirkeContent({ filters }: { filters: BezirkeFilter }) {
       <BezirkeTable bezirke={data.bezirke} />
       
       {/* Pagination */}
-      {data.pagination.totalPages > 1 && (
+      {data.pagination && data.pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-secondary-700">
             Zeige {((data.pagination.page - 1) * data.pagination.limit) + 1} bis {Math.min(data.pagination.page * data.pagination.limit, data.pagination.total)} von {data.pagination.total} Bezirken
           </div>
           <div className="flex gap-2">
-            {data.pagination.page > 1 && (
+            {data.pagination && data.pagination.page > 1 && (
               <Link href={`?${new URLSearchParams({ ...filters as any, page: String(data.pagination.page - 1) }).toString()}`}>
                 <Button variant="outline" size="sm">
                   Vorherige
                 </Button>
               </Link>
             )}
-            {data.pagination.page < data.pagination.totalPages && (
+            {data.pagination && data.pagination.page < data.pagination.totalPages && (
               <Link href={`?${new URLSearchParams({ ...filters as any, page: String(data.pagination.page + 1) }).toString()}`}>
                 <Button variant="outline" size="sm">
                   Nächste

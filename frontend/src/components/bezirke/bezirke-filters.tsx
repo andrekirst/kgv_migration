@@ -77,6 +77,7 @@ export function BezirkeFilters({
   }
 
   const getActiveFiltersCount = () => {
+    if (!localFilters) return 0
     return Object.keys(localFilters).filter(key => {
       const value = localFilters[key as keyof BezirkeFilter]
       return value !== undefined && value !== '' && value !== null
