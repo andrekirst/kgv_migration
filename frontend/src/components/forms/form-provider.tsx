@@ -13,7 +13,8 @@ import {
   UseFormProps, 
   UseFormReturn, 
   FieldValues,
-  FormProvider as RHFFormProvider
+  FormProvider as RHFFormProvider,
+  useFormContext as useRHFFormContext
 } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -349,8 +350,8 @@ export function FormField({
   children,
   className = ''
 }: FormFieldProps) {
-  const { formState } = useFormContext()
-  const error = formState.errors[name]
+  const { formState } = useRHFFormContext()
+  const error = formState?.errors?.[name]
   const hasError = !!error
 
   return (
