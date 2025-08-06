@@ -115,7 +115,7 @@ export function BezirkeFilters({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Bezirke durchsuchen..."
-            value={localFilters.search || ''}
+            value={localFilters?.search || ''}
             onChange={(e) => updateFilter('search', e.target.value || undefined)}
             className="pl-10"
           />
@@ -149,7 +149,7 @@ export function BezirkeFilters({
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Status</label>
                   <Select
-                    value={localFilters.aktiv === undefined ? 'all' : String(localFilters.aktiv)}
+                    value={localFilters?.aktiv === undefined ? 'all' : String(localFilters?.aktiv)}
                     onValueChange={(value) => 
                       updateFilter('aktiv', value === 'all' ? undefined : value === 'true')
                     }
@@ -173,7 +173,7 @@ export function BezirkeFilters({
                       Ort
                     </label>
                     <Select
-                      value={localFilters.search || ''}
+                      value={localFilters?.search || ''}
                       onValueChange={(value) => updateFilter('search', value || undefined)}
                     >
                       <SelectTrigger>
@@ -199,7 +199,7 @@ export function BezirkeFilters({
                       Bezirksleiter
                     </label>
                     <Select
-                      value={localFilters.search || ''}
+                      value={localFilters?.search || ''}
                       onValueChange={(value) => updateFilter('search', value || undefined)}
                     >
                       <SelectTrigger>
@@ -222,7 +222,7 @@ export function BezirkeFilters({
                   <label className="text-sm font-medium">Sortierung</label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select
-                      value={localFilters.sortBy || 'name'}
+                      value={localFilters?.sortBy || 'name'}
                       onValueChange={(value) => updateFilter('sortBy', value as any)}
                     >
                       <SelectTrigger>
@@ -235,7 +235,7 @@ export function BezirkeFilters({
                       </SelectContent>
                     </Select>
                     <Select
-                      value={localFilters.sortOrder || 'asc'}
+                      value={localFilters?.sortOrder || 'asc'}
                       onValueChange={(value) => updateFilter('sortOrder', value as any)}
                     >
                       <SelectTrigger>
@@ -281,7 +281,7 @@ export function BezirkeFilters({
           </label>
           <Input
             placeholder="Name, Beschreibung oder Bezirksleiter..."
-            value={localFilters.search || ''}
+            value={localFilters?.search || ''}
             onChange={(e) => updateFilter('search', e.target.value || undefined)}
           />
         </div>
@@ -293,7 +293,7 @@ export function BezirkeFilters({
             Status
           </label>
           <Select
-            value={localFilters.aktiv === undefined ? 'all' : String(localFilters.aktiv)}
+            value={localFilters?.aktiv === undefined ? 'all' : String(localFilters?.aktiv)}
             onValueChange={(value) => 
               updateFilter('aktiv', value === 'all' ? undefined : value === 'true')
             }
@@ -317,7 +317,7 @@ export function BezirkeFilters({
               Ort
             </label>
             <Select
-              value={localFilters.search || ''}
+              value={localFilters?.search || ''}
               onValueChange={(value) => updateFilter('search', value || undefined)}
             >
               <SelectTrigger>
@@ -343,7 +343,7 @@ export function BezirkeFilters({
               Bezirksleiter
             </label>
             <Select
-              value={localFilters.search || ''}
+              value={localFilters?.search || ''}
               onValueChange={(value) => updateFilter('search', value || undefined)}
             >
               <SelectTrigger>
@@ -371,7 +371,7 @@ export function BezirkeFilters({
             <div className="space-y-1">
               <label className="text-xs text-gray-600 dark:text-gray-400">Sortieren nach</label>
               <Select
-                value={localFilters.sortBy || 'name'}
+                value={localFilters?.sortBy || 'name'}
                 onValueChange={(value) => updateFilter('sortBy', value as any)}
               >
                 <SelectTrigger>
@@ -387,7 +387,7 @@ export function BezirkeFilters({
             <div className="space-y-1">
               <label className="text-xs text-gray-600 dark:text-gray-400">Reihenfolge</label>
               <Select
-                value={localFilters.sortOrder || 'asc'}
+                value={localFilters?.sortOrder || 'asc'}
                 onValueChange={(value) => updateFilter('sortOrder', value as any)}
               >
                 <SelectTrigger>
@@ -407,24 +407,24 @@ export function BezirkeFilters({
           <div className="space-y-2">
             <label className="text-sm font-medium">Aktive Filter</label>
             <div className="flex flex-wrap gap-2">
-              {localFilters.search && (
+              {localFilters?.search && (
                 <FilterBadge
                   label="Suche"
-                  value={localFilters.search}
+                  value={localFilters?.search}
                   onRemove={() => clearFilter('search')}
                 />
               )}
-              {localFilters.aktiv !== undefined && (
+              {localFilters?.aktiv !== undefined && (
                 <FilterBadge
                   label="Status"
-                  value={localFilters.aktiv ? 'Aktiv' : 'Inaktiv'}
+                  value={localFilters?.aktiv ? 'Aktiv' : 'Inaktiv'}
                   onRemove={() => clearFilter('aktiv')}
                 />
               )}
-              {localFilters.sortBy && localFilters.sortBy !== 'name' && (
+              {localFilters?.sortBy && localFilters?.sortBy !== 'name' && (
                 <FilterBadge
                   label="Sortierung"
-                  value={`${localFilters.sortBy} ${localFilters.sortOrder === 'desc' ? 'absteigend' : 'aufsteigend'}`}
+                  value={`${localFilters?.sortBy} ${localFilters?.sortOrder === 'desc' ? 'absteigend' : 'aufsteigend'}`}
                   onRemove={() => {
                     clearFilter('sortBy')
                     clearFilter('sortOrder')
@@ -443,14 +443,14 @@ export function BezirkeFilters({
               type="number"
               min="1"
               placeholder="1"
-              value={localFilters.page || ''}
+              value={localFilters?.page || ''}
               onChange={(e) => updateFilter('page', e.target.value ? parseInt(e.target.value) : undefined)}
             />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-gray-600 dark:text-gray-400">Anzahl pro Seite</label>
             <Select
-              value={String(localFilters.limit || 20)}
+              value={String(localFilters?.limit || 20)}
               onValueChange={(value) => updateFilter('limit', parseInt(value))}
             >
               <SelectTrigger>
