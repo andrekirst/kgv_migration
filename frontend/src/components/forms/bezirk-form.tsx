@@ -59,16 +59,16 @@ function BezirkFormFields({ mode }: BezirkFormFieldsProps) {
         <div className="flex items-center gap-2 mb-4">
           <MapPin className="h-5 w-5 text-primary-600" />
           <h3 className="text-lg font-semibold text-gray-900">
-            Grundinformationen
+            Bezirk Information
           </h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <FormField
             name="name"
             label="Bezirksname"
             required
-            className="md:col-span-2"
+            description="Maximal 10 Zeichen"
           >
             <Controller
               name="name"
@@ -76,11 +76,12 @@ function BezirkFormFields({ mode }: BezirkFormFieldsProps) {
                 <Input
                   {...field}
                   id="name"
-                  placeholder="z.B. Bezirk Nord, Zentrum, etc."
+                  placeholder="z.B. Nord, Süd, A1"
                   error={!!fieldState.error}
                   helperText={fieldState.error?.message}
                   disabled={isSubmitting}
                   autoComplete="off"
+                  maxLength={10}
                 />
               )}
             />
@@ -90,7 +91,6 @@ function BezirkFormFields({ mode }: BezirkFormFieldsProps) {
             name="beschreibung"
             label="Beschreibung"
             description="Kurze Beschreibung des Bezirks (optional)"
-            className="md:col-span-2"
           >
             <Controller
               name="beschreibung"
@@ -118,221 +118,6 @@ function BezirkFormFields({ mode }: BezirkFormFieldsProps) {
           </FormField>
         </div>
       </Card>
-
-      {/* Bezirksleitung */}
-      <Card className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <User className="h-5 w-5 text-primary-600" />
-          <h3 className="text-lg font-semibold text-gray-900">
-            Bezirksleitung
-          </h3>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            name="bezirksleiter"
-            label="Bezirksleiter/in"
-            description="Name der verantwortlichen Person"
-          >
-            <Controller
-              name="bezirksleiter"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id="bezirksleiter"
-                  placeholder="Max Mustermann"
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  disabled={isSubmitting}
-                  autoComplete="name"
-                  value={field.value || ''}
-                />
-              )}
-            />
-          </FormField>
-
-          <FormField
-            name="telefon"
-            label="Telefon"
-            description="Telefonnummer der Bezirksleitung"
-          >
-            <Controller
-              name="telefon"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id="telefon"
-                  type="tel"
-                  placeholder="0123 456789"
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  disabled={isSubmitting}
-                  autoComplete="tel"
-                  value={field.value || ''}
-                />
-              )}
-            />
-          </FormField>
-
-          <FormField
-            name="email"
-            label="E-Mail"
-            description="E-Mail-Adresse der Bezirksleitung"
-            className="md:col-span-2"
-          >
-            <Controller
-              name="email"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id="email"
-                  type="email"
-                  placeholder="bezirksleiter@kgv-beispiel.de"
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  disabled={isSubmitting}
-                  autoComplete="email"
-                  value={field.value || ''}
-                />
-              )}
-            />
-          </FormField>
-        </div>
-      </Card>
-
-      {/* Adresse */}
-      <Card className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Mail className="h-5 w-5 text-primary-600" />
-          <h3 className="text-lg font-semibold text-gray-900">
-            Postanschrift
-          </h3>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <FormField
-            name="adresse.strasse"
-            label="Straße"
-            className="md:col-span-2"
-          >
-            <Controller
-              name="adresse.strasse"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id="adresse.strasse"
-                  placeholder="Musterstraße"
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  disabled={isSubmitting}
-                  autoComplete="street-address"
-                  value={field.value || ''}
-                />
-              )}
-            />
-          </FormField>
-
-          <FormField
-            name="adresse.hausnummer"
-            label="Hausnummer"
-          >
-            <Controller
-              name="adresse.hausnummer"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id="adresse.hausnummer"
-                  placeholder="123"
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  disabled={isSubmitting}
-                  value={field.value || ''}
-                />
-              )}
-            />
-          </FormField>
-
-          <FormField
-            name="adresse.plz"
-            label="PLZ"
-          >
-            <Controller
-              name="adresse.plz"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id="adresse.plz"
-                  placeholder="12345"
-                  maxLength={5}
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  disabled={isSubmitting}
-                  autoComplete="postal-code"
-                  value={field.value || ''}
-                />
-              )}
-            />
-          </FormField>
-
-          <FormField
-            name="adresse.ort"
-            label="Ort"
-            className="md:col-span-3"
-          >
-            <Controller
-              name="adresse.ort"
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id="adresse.ort"
-                  placeholder="Musterstadt"
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  disabled={isSubmitting}
-                  autoComplete="address-level2"
-                  value={field.value || ''}
-                />
-              )}
-            />
-          </FormField>
-        </div>
-      </Card>
-
-      {/* Status für Edit-Modus */}
-      {mode === 'edit' && (
-        <Card className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Status
-            </h3>
-          </div>
-          
-          <FormField
-            name="aktiv"
-            label="Bezirk ist aktiv"
-            description="Deaktivierte Bezirke werden nicht in Listen angezeigt"
-          >
-            <Controller
-              name="aktiv"
-              render={({ field }) => (
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="aktiv"
-                    checked={field.value || false}
-                    onChange={(e) => field.onChange(e.target.checked)}
-                    disabled={isSubmitting}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="aktiv" className="ml-2 text-sm text-gray-700">
-                    Bezirk ist aktiv und verfügbar
-                  </label>
-                </div>
-              )}
-            />
-          </FormField>
-        </Card>
-      )}
     </div>
   )
 }
@@ -433,16 +218,7 @@ export function BezirkForm({
     if (mode === 'create') {
       return {
         name: '',
-        beschreibung: '',
-        bezirksleiter: '',
-        telefon: '',
-        email: '',
-        adresse: {
-          strasse: '',
-          hausnummer: '',
-          plz: '',
-          ort: ''
-        }
+        beschreibung: ''
       } as BezirkCreateFormData
     } else {
       return {

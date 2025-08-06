@@ -137,7 +137,7 @@ export const bezirkCreateSchema = z.object({
     .string()
     .min(1, 'Bezirksname ist erforderlich')
     .min(2, 'Bezirksname muss mindestens 2 Zeichen haben')
-    .max(100, 'Bezirksname darf maximal 100 Zeichen haben')
+    .max(10, 'Bezirksname darf maximal 10 Zeichen haben')
     .regex(
       /^[a-zA-ZäöüÄÖÜß0-9\s\-().]+$/,
       'Bezirksname darf nur Buchstaben, Zahlen, Leerzeichen und Sonderzeichen (-.()) enthalten'
@@ -148,11 +148,8 @@ export const bezirkCreateSchema = z.object({
     .refine(
       (val) => !val || val.length <= 500,
       { message: 'Beschreibung darf maximal 500 Zeichen haben' }
-    ),
-  bezirksleiter: optionalNameSchema,
-  telefon: telefonnummerSchema,
-  email: emailSchema,
-  adresse: adresseSchema.optional()
+    )
+  // Removed other fields that backend doesn't support yet
 })
 
 /**

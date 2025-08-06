@@ -41,14 +41,14 @@ export function useBezirke(
     queryFn: async () => {
       const params = new URLSearchParams()
       
-      if (filters?.search) params.append('searchTerm', filters.search)
-      if (filters?.aktiv !== undefined) params.append('isActive', filters.aktiv.toString())
-      if (filters?.page) params.append('pageNumber', filters.page.toString())
-      if (filters?.limit) params.append('pageSize', filters.limit.toString())
+      if (filters?.search) params.append('search', filters.search)
+      if (filters?.aktiv !== undefined) params.append('aktiv', filters.aktiv.toString())
+      if (filters?.page) params.append('page', filters.page.toString())
+      if (filters?.limit) params.append('limit', filters.limit.toString())
       if (filters?.sortBy) params.append('sortBy', filters.sortBy)
-      if (filters?.sortOrder) params.append('sortDirection', filters.sortOrder)
+      if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder)
 
-      const response = await apiClient.get<PaginatedResponse<Bezirk>>(
+      const response = await apiClient.get<Bezirk[]>(
         `/bezirke?${params.toString()}`
       )
 
@@ -56,14 +56,15 @@ export function useBezirke(
         throw new Error('Failed to fetch districts')
       }
 
-      // Transform to expected format
+      // Backend returns simple array, create mock pagination
+      const bezirke = response.data
       return {
-        bezirke: response.data.data,
+        bezirke,
         pagination: {
-          page: response.data.pageNumber,
-          limit: response.data.pageSize,
-          total: response.data.totalCount,
-          totalPages: response.data.totalPages
+          page: filters?.page || 1,
+          limit: filters?.limit || 20,
+          total: bezirke.length,
+          totalPages: 1
         },
         filters
       } as BezirkeListResponse
@@ -173,8 +174,8 @@ export function useBezirkeDropdown(
   return useQuery({
     queryKey: queryKeys.bezirke.dropdown(),
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<Bezirk>>(
-        `/bezirke?isActive=true&pageSize=1000&sortBy=name&sortDirection=asc`
+      const response = await apiClient.get<Bezirk[]>(
+        `/bezirke?aktiv=true&limit=1000&sortBy=name&sortOrder=asc`
       )
       
       if (!response.success || !response.data) {
@@ -182,7 +183,7 @@ export function useBezirkeDropdown(
       }
       
       // Return only id and name for dropdown
-      return response.data.data.map(bezirk => ({
+      return response.data.map(bezirk => ({
         id: bezirk.id,
         name: bezirk.name
       }))
@@ -208,7 +209,16 @@ export function useCreateBezirk(
 
   return useMutation({
     mutationFn: async (data: BezirkCreateRequest) => {
-      const response = await apiClient.post<Bezirk>('/bezirke', data)
+      // Transform frontend data to backend format
+      const backendData = {
+        name: data.name,
+        description: data.beschreibung || null,
+        displayName: data.displayName || null,
+        sortOrder: data.sortOrder || 0,
+        flaeche: data.flaeche || null
+      }
+      
+      const response = await apiClient.post<Bezirk>('/bezirke', backendData)
       
       if (!response.success || !response.data) {
         throw new Error('Failed to create district')
