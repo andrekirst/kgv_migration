@@ -65,7 +65,7 @@ export {
   type UseAntragCreateFormOptions,
   type UseAntragEditFormOptions,
   type UseAsyncValidationOptions
-} from '../hooks/forms/use-form-mutations'
+} from '../../hooks/forms/use-form-mutations'
 
 // =============================================================================
 // VALIDATION SCHEMAS & UTILITIES
