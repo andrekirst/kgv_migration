@@ -191,7 +191,7 @@ export function KGVFormProvider<T extends FieldValues>({
     hasErrors: Object.keys(form.formState.errors).length > 0,
     errorCount: Object.keys(form.formState.errors).length,
     isDirty: isFormDirty(form.formState),
-    canSubmit: form.formState.isValid && !isSubmitting,
+    canSubmit: !isSubmitting, // Button ist klickbar wenn nicht am Senden
     
     showValidationErrors: () => {
       const errors = form.formState.errors
@@ -388,13 +388,24 @@ export function FormField({
  * Hook für Form-Status Überwachung
  */
 export function useFormStatus() {
-  const context = useFormContext()
-  return {
-    isSubmitting: context.isSubmitting,
-    hasErrors: context.hasErrors,
-    errorCount: context.errorCount,
-    isDirty: context.isDirty,
-    canSubmit: context.canSubmit
+  try {
+    const context = useFormContext()
+    return {
+      isSubmitting: context.isSubmitting,
+      hasErrors: context.hasErrors,
+      errorCount: context.errorCount,
+      isDirty: context.isDirty,
+      canSubmit: context.canSubmit
+    }
+  } catch (error) {
+    // Fallback wenn Context nicht verfügbar ist
+    return {
+      isSubmitting: false,
+      hasErrors: false,
+      errorCount: 0,
+      isDirty: false,
+      canSubmit: true // Button soll klickbar sein wenn kein Context verfügbar
+    }
   }
 }
 
@@ -402,11 +413,20 @@ export function useFormStatus() {
  * Hook für Form-Aktionen
  */
 export function useFormActions() {
-  const context = useFormContext()
-  return {
-    showValidationErrors: context.showValidationErrors,
-    clearErrors: context.clearErrors,
-    focusFirstError: context.focusFirstError
+  try {
+    const context = useFormContext()
+    return {
+      showValidationErrors: context.showValidationErrors,
+      clearErrors: context.clearErrors,
+      focusFirstError: context.focusFirstError
+    }
+  } catch (error) {
+    // Fallback wenn Context nicht verfügbar ist
+    return {
+      showValidationErrors: () => {},
+      clearErrors: () => {},
+      focusFirstError: () => {}
+    }
   }
 }
 
