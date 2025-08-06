@@ -1,4 +1,6 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/(dashboard)/page": "app/(dashboard)/page.js",
   "/(dashboard)/bezirke/page": "app/(dashboard)/bezirke/page.js",
   "/(dashboard)/bezirke/neu/page": "app/(dashboard)/bezirke/neu/page.js"
 }
