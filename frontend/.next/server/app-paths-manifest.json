@@ -1,1 +1,3 @@
-{}
+{
+  "/(dashboard)/bezirke/page": "app/(dashboard)/bezirke/page.js"
+}

@@ -63,7 +63,7 @@ async function getGesamtStatistiken() {
 }
 
 function BezirkeTable({ bezirke }: { bezirke: Bezirk[] }) {
-  if (bezirke.length === 0) {
+  if (!bezirke || bezirke.length === 0) {
     return (
       <Card className="p-8 text-center">
         <div className="text-secondary-500">
@@ -301,26 +301,30 @@ export default async function BezirkePage({ searchParams }: BezirkePageProps) {
 async function BezirkeContent({ filters }: { filters: BezirkeFilter }) {
   const data = await getBezirke(filters)
   
+  // Fallback für den Fall, dass data null oder undefined ist
+  const safeBezirke = data?.bezirke || []
+  const safePagination = data?.pagination || null
+  
   return (
     <div className="space-y-6">
-      <BezirkeTable bezirke={data.bezirke} />
+      <BezirkeTable bezirke={safeBezirke} />
       
       {/* Pagination */}
-      {data.pagination && data.pagination.totalPages > 1 && (
+      {safePagination && safePagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-secondary-700">
-            Zeige {((data.pagination.page - 1) * data.pagination.limit) + 1} bis {Math.min(data.pagination.page * data.pagination.limit, data.pagination.total)} von {data.pagination.total} Bezirken
+            Zeige {((safePagination.page - 1) * safePagination.limit) + 1} bis {Math.min(safePagination.page * safePagination.limit, safePagination.total)} von {safePagination.total} Bezirken
           </div>
           <div className="flex gap-2">
-            {data.pagination && data.pagination.page > 1 && (
-              <Link href={`?${new URLSearchParams({ ...filters as any, page: String(data.pagination.page - 1) }).toString()}`}>
+            {safePagination && safePagination.page > 1 && (
+              <Link href={`?${new URLSearchParams({ ...filters as any, page: String(safePagination.page - 1) }).toString()}`}>
                 <Button variant="outline" size="sm">
                   Vorherige
                 </Button>
               </Link>
             )}
-            {data.pagination && data.pagination.page < data.pagination.totalPages && (
-              <Link href={`?${new URLSearchParams({ ...filters as any, page: String(data.pagination.page + 1) }).toString()}`}>
+            {safePagination && safePagination.page < safePagination.totalPages && (
+              <Link href={`?${new URLSearchParams({ ...filters as any, page: String(safePagination.page + 1) }).toString()}`}>
                 <Button variant="outline" size="sm">
                   Nächste
                 </Button>

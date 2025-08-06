@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"../node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsComponent/EDEL3XIZ.js\":{\"id\":\"../node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsComponent/EDEL3XIZ.js\",\"files\":[\"static/chunks/commons.js\"]},\"../node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsPanelComponent/RN252AT2.js\":{\"id\":\"../node_modules/@tanstack/query-devtools/build/dev.js -> ./DevtoolsPanelComponent/RN252AT2.js\",\"files\":[\"static/chunks/commons.js\"]}}"
