@@ -49,10 +49,9 @@ public abstract class BaseEntity
     public string? DeletedBy { get; set; }
 
     /// <summary>
-    /// Row version for optimistic concurrency
+    /// PostgreSQL xmin for optimistic concurrency
     /// </summary>
-    [Timestamp]
-    public byte[]? RowVersion { get; set; }
+    public uint xmin { get; set; }
 
     /// <summary>
     /// Sets the created by field and created at timestamp
