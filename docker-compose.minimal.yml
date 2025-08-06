@@ -1,0 +1,75 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: kgv-postgres
+    environment:
+      POSTGRES_DB: kgv_db
+      POSTGRES_USER: kgv_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kgv_secure_password_2024}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgresql/01_schema_core.sql:/docker-entrypoint-initdb.d/01_schema_core.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kgv_user -d kgv_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - kgv-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: kgv-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password_2024}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - kgv-network
+
+  # KGV Frontend (Next.js) - Standalone Development
+  kgv-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: kgv-frontend
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+    networks:
+      - kgv-network
+
+networks:
+  kgv-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

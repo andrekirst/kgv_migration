@@ -1,9 +1,7 @@
-using System.Linq.Expressions;
 using KGV.Domain.Common;
 using KGV.Domain.Entities;
 using KGV.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace KGV.Infrastructure.Data;
 
@@ -17,155 +15,185 @@ public class KgvDbContext : DbContext
     }
 
     /// <summary>
-    /// Antraege (Applications)
-    /// </summary>
-    public DbSet<Antrag> Antraege { get; set; } = null!;
-
-    /// <summary>
     /// Bezirke (Districts)
     /// </summary>
     public DbSet<Bezirk> Bezirke { get; set; } = null!;
 
     /// <summary>
-    /// Katasterbezirke (Cadastral districts)
+    /// Antraege (Applications)
+    /// </summary>
+    public DbSet<Antrag> Antraege { get; set; } = null!;
+
+    /// <summary>
+    /// Katasterbezirke (Cadastral Districts)
     /// </summary>
     public DbSet<Katasterbezirk> Katasterbezirke { get; set; } = null!;
 
     /// <summary>
-    /// Aktenzeichen (File references)
+    /// Bezirke-Katasterbezirke Junction Table
     /// </summary>
-    public DbSet<AktenzeichenEntity> Aktenzeichen { get; set; } = null!;
-
-    /// <summary>
-    /// Eingangsnummern (Entry numbers)
-    /// </summary>
-    public DbSet<Eingangsnummer> Eingangsnummern { get; set; } = null!;
-
-    /// <summary>
-    /// Personen (People/Users)
-    /// </summary>
-    public DbSet<Person> Personen { get; set; } = null!;
-
-    /// <summary>
-    /// Verlauf (History entries)
-    /// </summary>
-    public DbSet<Verlauf> Verlauf { get; set; } = null!;
+    public DbSet<BezirkeKatasterbezirke> BezirkeKatasterbezirke { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Apply configurations
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(KgvDbContext).Assembly);
+        // Configure Bezirk entity
+        modelBuilder.Entity<Bezirk>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(10);
+            
+            entity.Property(e => e.DisplayName)
+                .HasMaxLength(100);
+            
+            entity.Property(e => e.Description)
+                .HasMaxLength(500);
+            
+            entity.Property(e => e.Flaeche)
+                .HasPrecision(18, 2);
+            
+            entity.HasIndex(e => e.Name)
+                .IsUnique();
+        });
 
-        // Global query filters for soft delete
+        // Configure Antrag entity
+        modelBuilder.Entity<Antrag>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            // Configure value objects as owned entities
+            entity.OwnsOne(e => e.Adresse, address =>
+            {
+                address.Property(a => a.Strasse).HasColumnName("Strasse").HasMaxLength(200);
+                address.Property(a => a.PLZ).HasColumnName("PLZ").HasMaxLength(5);
+                address.Property(a => a.Ort).HasColumnName("Ort").HasMaxLength(100);
+            });
+
+            entity.OwnsOne(e => e.Telefon, phone =>
+            {
+                phone.Property(p => p.Value).HasColumnName("Telefon").HasMaxLength(50);
+            });
+
+            entity.OwnsOne(e => e.MobilTelefon, phone =>
+            {
+                phone.Property(p => p.Value).HasColumnName("MobilTelefon").HasMaxLength(50);
+            });
+
+            entity.OwnsOne(e => e.GeschTelefon, phone =>
+            {
+                phone.Property(p => p.Value).HasColumnName("GeschTelefon").HasMaxLength(50);
+            });
+
+            entity.OwnsOne(e => e.MobilTelefon2, phone =>
+            {
+                phone.Property(p => p.Value).HasColumnName("MobilTelefon2").HasMaxLength(50);
+            });
+
+            entity.OwnsOne(e => e.EMail, email =>
+            {
+                email.Property(e => e.Value).HasColumnName("EMail").HasMaxLength(200);
+            });
+
+            // Configure string properties
+            entity.Property(e => e.Vorname).HasMaxLength(50);
+            entity.Property(e => e.Nachname).HasMaxLength(50);
+            entity.Property(e => e.Titel).HasMaxLength(50);
+            entity.Property(e => e.Vorname2).HasMaxLength(50);
+            entity.Property(e => e.Nachname2).HasMaxLength(50);
+            entity.Property(e => e.Titel2).HasMaxLength(50);
+            entity.Property(e => e.Briefanrede).HasMaxLength(150);
+            entity.Property(e => e.WartelistenNr32).HasMaxLength(20);
+            entity.Property(e => e.WartelistenNr33).HasMaxLength(20);
+            entity.Property(e => e.Wunsch).HasMaxLength(600);
+            entity.Property(e => e.Vermerk).HasMaxLength(2000);
+            entity.Property(e => e.Geburtstag).HasMaxLength(100);
+            entity.Property(e => e.Geburtstag2).HasMaxLength(100);
+
+            // Configure enums
+            entity.Property(e => e.Anrede).HasConversion<string>();
+            entity.Property(e => e.Anrede2).HasConversion<string>();
+            entity.Property(e => e.Status).HasConversion<string>();
+        });
+
+        // Configure Katasterbezirk entity
+        modelBuilder.Entity<Katasterbezirk>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.KatasterbezirkCode)
+                .IsRequired()
+                .HasMaxLength(10);
+            
+            entity.Property(e => e.KatasterbezirkName)
+                .IsRequired()
+                .HasMaxLength(50);
+            
+            entity.Property(e => e.Description)
+                .HasMaxLength(500);
+
+            // Configure relationship with Bezirk
+            entity.HasOne(e => e.Bezirk)
+                .WithMany(b => b.Katasterbezirke)
+                .HasForeignKey(e => e.BezirkId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.BezirkId, e.KatasterbezirkCode })
+                .IsUnique();
+        });
+
+        // Configure BezirkeKatasterbezirke junction entity
+        modelBuilder.Entity<BezirkeKatasterbezirke>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.BezirkName)
+                .IsRequired()
+                .HasMaxLength(10);
+            
+            entity.Property(e => e.KatasterbezirkCode)
+                .IsRequired()
+                .HasMaxLength(10);
+            
+            entity.Property(e => e.KatasterbezirkName)
+                .IsRequired()
+                .HasMaxLength(50);
+            
+            entity.Property(e => e.Beschreibung)
+                .HasMaxLength(500);
+
+            // Configure relationships
+            entity.HasOne(e => e.Bezirk)
+                .WithMany(b => b.BezirkeKatasterbezirke)
+                .HasForeignKey(e => e.BezirkId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Katasterbezirk)
+                .WithMany(k => k.BezirkeKatasterbezirke)
+                .HasForeignKey(e => e.KatasterbezirkId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Unique constraint on legacy fields
+            entity.HasIndex(e => new { e.BezirkName, e.KatasterbezirkCode })
+                .IsUnique();
+        });
+
+        // Configure BaseEntity properties for all entities
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
             {
-                var parameter = Expression.Parameter(entityType.ClrType, "e");
-                var body = Expression.Equal(
-                    Expression.Property(parameter, nameof(BaseEntity.IsDeleted)),
-                    Expression.Constant(false));
-                var lambda = Expression.Lambda(body, parameter);
-                
-                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+                // Configure PostgreSQL optimistic concurrency with xmin system column
+                modelBuilder.Entity(entityType.ClrType)
+                    .Property<uint>("xmin")
+                    .HasColumnType("xid")
+                    .ValueGeneratedOnAddOrUpdate()
+                    .IsConcurrencyToken();
             }
         }
-
-        // Configure value converters for value objects
-        ConfigureValueObjects(modelBuilder);
-
-        // Configure PostgreSQL-specific features
-        ConfigurePostgreSqlFeatures(modelBuilder);
-    }
-
-    /// <summary>
-    /// Configures value object conversions
-    /// </summary>
-    private static void ConfigureValueObjects(ModelBuilder modelBuilder)
-    {
-        // Address value object conversion
-        var addressConverter = new ValueConverter<Address?, string?>(
-            v => v != null ? $"{v.Strasse}|{v.PLZ}|{v.Ort}" : null,
-            v => !string.IsNullOrEmpty(v) ? 
-                ParseAddress(v) : null);
-
-        var phoneConverter = new ValueConverter<PhoneNumber?, string?>(
-            v => v != null ? v.Value : null,
-            v => !string.IsNullOrEmpty(v) ? new PhoneNumber(v) : null);
-
-        var emailConverter = new ValueConverter<Email?, string?>(
-            v => v != null ? v.Value : null,
-            v => !string.IsNullOrEmpty(v) ? new Email(v) : null);
-
-        // Apply converters to Antrag entity
-        modelBuilder.Entity<Antrag>(entity =>
-        {
-            entity.Property(e => e.Adresse)
-                .HasConversion(addressConverter)
-                .HasMaxLength(200);
-
-            entity.Property(e => e.Telefon)
-                .HasConversion(phoneConverter)
-                .HasMaxLength(50);
-
-            entity.Property(e => e.MobilTelefon)
-                .HasConversion(phoneConverter)
-                .HasMaxLength(50);
-
-            entity.Property(e => e.GeschTelefon)
-                .HasConversion(phoneConverter)
-                .HasMaxLength(50);
-
-            entity.Property(e => e.MobilTelefon2)
-                .HasConversion(phoneConverter)
-                .HasMaxLength(50);
-
-            entity.Property(e => e.EMail)
-                .HasConversion(emailConverter)
-                .HasMaxLength(100);
-        });
-
-        // Apply converters to Person entity
-        modelBuilder.Entity<Person>(entity =>
-        {
-            entity.Property(e => e.Telefon)
-                .HasConversion(phoneConverter)
-                .HasMaxLength(50);
-
-            entity.Property(e => e.FAX)
-                .HasConversion(phoneConverter)
-                .HasMaxLength(50);
-
-            entity.Property(e => e.Email)
-                .HasConversion(emailConverter)
-                .HasMaxLength(100);
-        });
-    }
-
-    /// <summary>
-    /// Configures PostgreSQL-specific features
-    /// </summary>
-    private static void ConfigurePostgreSqlFeatures(ModelBuilder modelBuilder)
-    {
-        // Configure UUID generation
-        modelBuilder.HasPostgresExtension("uuid-ossp");
-
-        // Configure text search for German content
-        modelBuilder.HasPostgresExtension("unaccent");
-    }
-
-    /// <summary>
-    /// Parses address string back to Address value object
-    /// </summary>
-    private static Address ParseAddress(string addressString)
-    {
-        var parts = addressString.Split('|');
-        if (parts.Length != 3)
-            throw new InvalidOperationException($"Invalid address format: {addressString}");
-
-        return new Address(parts[0], parts[1], parts[2]);
     }
 
     /// <summary>
@@ -192,8 +220,7 @@ public class KgvDbContext : DbContext
     private void UpdateAuditFields()
     {
         var now = DateTime.UtcNow;
-        // In a real application, you would get the current user from a service
-        var currentUser = "system"; // This should come from ICurrentUserService
+        var currentUser = "system";
 
         foreach (var entry in ChangeTracker.Entries<BaseEntity>())
         {
@@ -207,13 +234,6 @@ public class KgvDbContext : DbContext
                 case EntityState.Modified:
                     entry.Entity.UpdatedAt = now;
                     entry.Entity.UpdatedBy = currentUser;
-                    break;
-
-                case EntityState.Deleted:
-                    entry.State = EntityState.Modified;
-                    entry.Entity.IsDeleted = true;
-                    entry.Entity.DeletedAt = now;
-                    entry.Entity.DeletedBy = currentUser;
                     break;
             }
         }

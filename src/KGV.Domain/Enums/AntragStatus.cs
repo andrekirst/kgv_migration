@@ -48,5 +48,15 @@ public enum AntragStatus
     /// <summary>
     /// Deaktiviert (Deactivated)
     /// </summary>
-    Deaktiviert = 9
+    Deaktiviert = 9,
+
+    /// <summary>
+    /// In Review (In review/evaluation)
+    /// </summary>
+    InReview = 10,
+
+    /// <summary>
+    /// Approved (Approved for processing)
+    /// </summary>
+    Approved = 11
 }

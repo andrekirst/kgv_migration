@@ -2,44 +2,19 @@
 
 // Providers component for global app state and configuration
 import * as React from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'react-hot-toast'
+import { createAppQueryClient } from '@/lib/react-query-config'
 
 interface ProvidersProps {
   children: React.ReactNode
 }
 
 export function Providers({ children }: ProvidersProps) {
-  // Create QueryClient with German error messages and optimized defaults
-  const [queryClient] = React.useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            // 5 minutes stale time for better UX
-            staleTime: 5 * 60 * 1000,
-            // 10 minutes cache time
-            gcTime: 10 * 60 * 1000,
-            // Retry failed requests 3 times
-            retry: 3,
-            // Retry delay with exponential backoff
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-            // Refetch on window focus for data freshness
-            refetchOnWindowFocus: true,
-            // Don't refetch on reconnect to avoid spam
-            refetchOnReconnect: false,
-          },
-          mutations: {
-            // Retry mutations once
-            retry: 1,
-            // Retry delay
-            retryDelay: 1000,
-          },
-        },
-      })
-  )
+  // Create QueryClient with comprehensive error handling and German localization
+  const [queryClient] = React.useState(() => createAppQueryClient())
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -113,6 +88,20 @@ export function Providers({ children }: ProvidersProps) {
         {process.env.NODE_ENV === 'development' && (
           <ReactQueryDevtools
             initialIsOpen={false}
+            position="bottom-right"
+            toggleButtonProps={{
+              style: {
+                marginLeft: 'auto',
+                transform: 'scale(0.8)',
+                transformOrigin: 'bottom right',
+                zIndex: 99999
+              },
+            }}
+            panelProps={{
+              style: {
+                zIndex: 99998
+              }
+            }}
           />
         )}
       </ThemeProvider>

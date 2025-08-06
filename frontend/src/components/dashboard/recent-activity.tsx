@@ -20,6 +20,37 @@ import {
 import { formatRelativeTime, formatDate } from '@/lib/utils'
 import { AntragStatus } from '@/types/api'
 
+// Client-only component to prevent hydration mismatch
+function ClientOnlyTime({ timestamp }: { timestamp: Date }) {
+  const [isClient, setIsClient] = React.useState(false)
+  
+  React.useEffect(() => {
+    setIsClient(true)
+  }, [])
+  
+  if (!isClient) {
+    // Show static date during SSR
+    return (
+      <time 
+        dateTime={timestamp.toISOString()}
+        title={formatDate(timestamp)}
+      >
+        {formatDate(timestamp)}
+      </time>
+    )
+  }
+  
+  // Show relative time on client
+  return (
+    <time 
+      dateTime={timestamp.toISOString()}
+      title={formatDate(timestamp)}
+    >
+      {formatRelativeTime(timestamp)}
+    </time>
+  )
+}
+
 // Mock activity data - replace with real API calls
 const mockActivities = [
   {
@@ -194,12 +225,9 @@ function ActivityItem({ activity, isLast }: ActivityItemProps) {
               <UserIcon className="h-3 w-3" />
               <span>{activity.user}</span>
               <span>•</span>
-              <time 
-                dateTime={activity.timestamp.toISOString()}
-                title={formatDate(activity.timestamp)}
-              >
-                {formatRelativeTime(activity.timestamp)}
-              </time>
+              <ClientOnlyTime 
+                timestamp={activity.timestamp}
+              />
             </div>
           </div>
           

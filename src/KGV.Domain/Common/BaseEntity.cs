@@ -49,8 +49,48 @@ public abstract class BaseEntity
     public string? DeletedBy { get; set; }
 
     /// <summary>
-    /// Row version for optimistic concurrency
+    /// PostgreSQL xmin for optimistic concurrency
     /// </summary>
-    [Timestamp]
-    public byte[]? RowVersion { get; set; }
+    public uint xmin { get; set; }
+
+    /// <summary>
+    /// Sets the created by field and created at timestamp
+    /// </summary>
+    /// <param name="createdBy">User who created the entity</param>
+    public virtual void SetCreatedBy(string createdBy)
+    {
+        CreatedBy = createdBy;
+        CreatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Sets the updated by field and updated at timestamp
+    /// </summary>
+    /// <param name="updatedBy">User who updated the entity</param>
+    public virtual void SetUpdatedBy(string updatedBy)
+    {
+        UpdatedBy = updatedBy;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Sets the deleted by field and deleted at timestamp for soft delete
+    /// </summary>
+    /// <param name="deletedBy">User who deleted the entity</param>
+    public virtual void SetDeletedBy(string deletedBy)
+    {
+        DeletedBy = deletedBy;
+        DeletedAt = DateTime.UtcNow;
+        IsDeleted = true;
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted entity
+    /// </summary>
+    public virtual void Restore()
+    {
+        IsDeleted = false;
+        DeletedAt = null;
+        DeletedBy = null;
+    }
 }

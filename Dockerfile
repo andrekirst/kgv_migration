@@ -12,21 +12,21 @@ COPY src/KGV.Domain/KGV.Domain.csproj ./src/KGV.Domain/
 COPY src/KGV.Application/KGV.Application.csproj ./src/KGV.Application/
 COPY src/KGV.Infrastructure/KGV.Infrastructure.csproj ./src/KGV.Infrastructure/
 COPY src/KGV.API/KGV.API.csproj ./src/KGV.API/
-COPY src/KGV.sln ./src/
+COPY src/KGV.Production.sln ./src/
 
 # Change ownership to non-root user
 RUN chown -R dotnet:dotnet /app
 USER dotnet
 
 # Restore dependencies
-RUN dotnet restore src/KGV.sln
+RUN dotnet restore src/KGV.Production.sln
 
 # Copy source code
 COPY --chown=dotnet:dotnet src/ ./src/
 
 # Build the application
 WORKDIR /app/src/KGV.API
-RUN dotnet restore ../KGV.sln
+RUN dotnet restore ../KGV.Production.sln
 RUN dotnet build -c Release --no-restore
 
 # Publish the application
