@@ -11,7 +11,7 @@ import {
 } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
 import { queryKeys, STALE_TIMES, CACHE_TIMES } from '@/lib/query-keys'
-import toast from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
 import type {
   Bezirk,
   BezirkCreateRequest,
@@ -209,6 +209,8 @@ export function useCreateBezirk(
 
   return useMutation({
     mutationFn: async (data: BezirkCreateRequest) => {
+      console.log('useCreateBezirk mutationFn called with data:', data)
+      
       // Transform frontend data to backend format
       const backendData = {
         name: data.name,
@@ -218,15 +220,22 @@ export function useCreateBezirk(
         flaeche: data.flaeche || null
       }
       
+      console.log('Transformed backend data:', backendData)
+      
       const response = await apiClient.post<Bezirk>('/bezirke', backendData)
+      console.log('API response:', response)
       
       if (!response.success || !response.data) {
+        console.error('API response failed:', response)
         throw new Error('Failed to create district')
       }
       
+      console.log('Successfully created bezirk:', response.data)
       return response.data
     },
     onSuccess: (newBezirk, variables) => {
+      console.log('useCreateBezirk onSuccess called with:', { newBezirk, variables })
+      
       // Invalidate and refetch districts list
       queryClient.invalidateQueries({ queryKey: queryKeys.bezirke.lists() })
       // Invalidate statistics
@@ -241,9 +250,11 @@ export function useCreateBezirk(
       toast.success(`Bezirk "${newBezirk.name}" wurde erfolgreich erstellt.`, {
         duration: 4000
       })
+      
+      console.log('useCreateBezirk onSuccess completed successfully')
     },
     onError: (error) => {
-      console.error('Failed to create district:', error)
+      console.error('useCreateBezirk onError called with:', error)
       toast.error('Fehler beim Erstellen des Bezirks. Bitte versuchen Sie es erneut.')
     },
     ...options
@@ -255,12 +266,12 @@ export function useCreateBezirk(
  * @param options - React Query mutation options
  */
 export function useUpdateBezirk(
-  options?: UseMutationOptions<Bezirk, Error, BezirkUpdateRequest & { id: number }>
+  options?: UseMutationOptions<Bezirk, Error, BezirkUpdateRequest & { id: string }>
 ) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, ...data }: BezirkUpdateRequest & { id: number }) => {
+    mutationFn: async ({ id, ...data }: BezirkUpdateRequest & { id: string }) => {
       const response = await apiClient.put<Bezirk>(`/bezirke/${id}`, data)
       
       if (!response.success || !response.data) {
@@ -298,12 +309,12 @@ export function useUpdateBezirk(
  * @param options - React Query mutation options
  */
 export function useDeleteBezirk(
-  options?: UseMutationOptions<void, Error, { id: number; force?: boolean }>
+  options?: UseMutationOptions<void, Error, { id: string; force?: boolean }>
 ) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, force = false }: { id: number; force?: boolean }) => {
+    mutationFn: async ({ id, force = false }: { id: string; force?: boolean }) => {
       const response = await apiClient.delete<void>(`/bezirke/${id}?force=${force}`)
       
       if (!response.success) {
@@ -389,7 +400,7 @@ export function useOptimisticBezirkUpdate() {
   const queryClient = useQueryClient()
 
   const updateOptimistically = React.useCallback(
-    (id: number, updater: (old: Bezirk) => Bezirk) => {
+    (id: string, updater: (old: Bezirk) => Bezirk) => {
       queryClient.setQueryData<Bezirk>(
         queryKeys.bezirke.detail(id),
         (old) => old ? updater(old) : old
@@ -399,7 +410,7 @@ export function useOptimisticBezirkUpdate() {
   )
 
   const revertOptimisticUpdate = React.useCallback(
-    (id: number) => {
+    (id: string) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bezirke.detail(id) })
     },
     [queryClient]

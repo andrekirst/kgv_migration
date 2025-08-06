@@ -248,11 +248,14 @@ export function BezirkForm({
 
   // Submit Handler
   const handleSubmit = React.useCallback(async (data: BezirkCreateFormData | BezirkUpdateFormData) => {
+    console.log('Form submitted with data:', data)
     try {
       let result: Bezirk
 
       if (mode === 'create') {
+        console.log('Creating bezirk...')
         result = await createBezirk.mutateAsync(data as BezirkCreateFormData)
+        console.log('Bezirk created successfully:', result)
       } else {
         const updateData = {
           id: initialData?.id!,
@@ -262,6 +265,7 @@ export function BezirkForm({
       }
 
       if (onSuccess) {
+        console.log('Calling onSuccess callback with result:', result)
         onSuccess(result)
       }
 

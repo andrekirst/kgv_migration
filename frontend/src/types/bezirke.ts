@@ -1,8 +1,19 @@
 // TypeScript types for Bezirke (Districts) and Parzellen (Plots) entities
 // Enhanced for React Query API integration
 export interface Bezirk {
-  id: number
+  id: string // Backend uses UUID strings
   name: string
+  displayName?: string
+  description?: string // Backend field name
+  isActive: boolean // Backend field name
+  sortOrder: number
+  flaeche?: number
+  anzahlParzellen: number
+  status: string
+  createdAt: string // Backend field name
+  updatedAt?: string // Backend field name
+  
+  // Legacy fields for compatibility
   beschreibung?: string
   bezirksleiter?: string
   telefon?: string
@@ -13,15 +24,15 @@ export interface Bezirk {
     plz?: string
     ort?: string
   }
-  statistiken: {
+  statistiken?: {
     gesamtParzellen: number
     belegteParzellen: number
     freieParzellen: number
     warteliste: number
   }
-  erstelltAm: string
-  aktualisiertAm: string
-  aktiv: boolean
+  erstelltAm?: string
+  aktualisiertAm?: string
+  aktiv?: boolean
 }
 
 export interface BezirkCreateRequest {

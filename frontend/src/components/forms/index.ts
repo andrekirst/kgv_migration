@@ -295,4 +295,4 @@ export function showValidationToast(errors: Record<string, string>) {
 }
 
 // Toast import für Helper Functions
-import toast from 'react-hot-toast'
+import { toast } from 'react-hot-toast'

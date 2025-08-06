@@ -10,8 +10,10 @@ export default function NeueBezirkPage() {
   const router = useRouter()
 
   const handleSuccess = (bezirk: Bezirk) => {
-    // Navigiere zur Detail-Seite des erstellten Bezirks
-    router.push(`/bezirke/${bezirk.id}`)
+    console.log('handleSuccess called with bezirk:', bezirk)
+    // Navigiere zurück zur Bezirke-Übersicht nach erfolgreicher Erstellung
+    console.log('Navigating to /bezirke')
+    router.push('/bezirke')
   }
 
   const handleCancel = () => {

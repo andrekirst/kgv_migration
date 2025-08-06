@@ -1,7 +1,7 @@
 // Enhanced API Client for KGV Frontend Application with Axios
 import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios'
 import { ApiError, ApiResponse } from '@/types/api'
-import toast from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
 
 // German error messages for better UX
 const GERMAN_ERROR_MESSAGES = {
@@ -155,10 +155,21 @@ class ApiClient {
       return
     }
 
-    toast.error(error.message, {
-      duration: error.status >= 500 ? 8000 : 6000,
-      position: 'top-right'
-    })
+    try {
+      toast.error(error.message, {
+        duration: error.status >= 500 ? 8000 : 6000,
+        position: 'top-right'
+      })
+    } catch (toastError) {
+      // Fallback: Log error to console if toast fails
+      console.error('Toast error:', toastError)
+      console.error('Original API Error:', error.message)
+      
+      // Alternative: Show browser alert as fallback
+      if (typeof window !== 'undefined') {
+        console.error(`API Fehler: ${error.message}`)
+      }
+    }
   }
 
   private async request<T>(

@@ -6,7 +6,8 @@
  */
 
 import { z } from 'zod'
-import { ParzellenStatus, AntragStatus, VerlaufArt, Anrede } from '@/types/api'
+import { AntragStatus, VerlaufArt, Anrede } from '@/types/api'
+import { ParzellenStatus } from '@/types/bezirke'
 
 // =============================================================================
 // UTILITY SCHEMAS

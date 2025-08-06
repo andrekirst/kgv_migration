@@ -416,3 +416,153 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+frontend/.next/cache/webpack/client-development/*
+frontend/.next/trace
+frontend/.next/trace/*
+
+# =============================================================================
+# KGV PROJECT SPECIFIC IGNORINGS
+# =============================================================================
+
+# .NET Build-Artefakte (spezifischer für src Verzeichnis)
+src/**/bin/
+src/**/obj/
+src/**/build_output.txt
+src/**/build_check.txt  
+src/**/build_result.txt
+
+# Frontend Build & Dependencies
+frontend/node_modules/
+frontend/.next/
+frontend/.next/cache/
+frontend/dist/
+frontend/build/
+frontend/out/
+node_modules/
+
+# TypeScript Build Files
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Next.js specific
+.next/
+out/
+.vercel/
+.turbo/
+.swc/
+
+# Testing & E2E
+test-results/
+e2e-test-results/
+playwright-report/
+coverage/
+*.lcov
+.nyc_output/
+
+# Playwright specific
+test-results*/
+playwright/.cache/
+playwright-results/
+.playwright/
+
+# Environment files (aber Templates behalten)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+# Keep template files:
+!.env.example
+!.env.template
+
+# Logs & Debug
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Temporary files
+/tmp/
+*.tmp
+*.temp
+
+# Cache directories  
+.cache/
+.parcel-cache/
+.sass-cache/
+.eslintcache
+
+# Package Manager
+node_modules/
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# IDE & Editors
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Docker
+.dockerignore
+
+# Storybook build outputs
+storybook-static/
+
+# Jest
+/coverage/
+/.nyc_output
+
+# ESLint
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.parcel-cache
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary folders
+tmp/
+temp/
