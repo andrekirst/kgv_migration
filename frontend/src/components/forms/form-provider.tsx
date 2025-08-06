@@ -350,12 +350,8 @@ export function FormField({
   children,
   className = ''
 }: FormFieldProps) {
-  // Access our custom form context which includes the form state
-  const context = useFormContext()
-  
-  // For now, let's not access errors directly and just render the field
-  // The error display will be handled by the form validation system
-  const error = null
+  // Temporarily disable context access to prevent undefined errors
+  // The form validation system will handle error display at form level
   const hasError = false
 
   return (
@@ -380,12 +376,6 @@ export function FormField({
       <div className="form-field-input">
         {children}
       </div>
-      
-      {hasError && (
-        <p className="mt-1 text-sm text-red-600" role="alert">
-          {error.message}
-        </p>
-      )}
     </div>
   )
 }
