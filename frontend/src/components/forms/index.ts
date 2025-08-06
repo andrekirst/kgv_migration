@@ -26,20 +26,11 @@ export {
 // FORM COMPONENTS
 // =============================================================================
 
-export {
-  BezirkForm,
-  type BezirkFormProps
-} from './bezirk-form'
+export { default as BezirkForm, type BezirkFormProps } from './bezirk-form'
 
-export {
-  ParzelleForm,
-  type ParzelleFormProps
-} from './parzelle-form'
+export { default as ParzelleForm, type ParzelleFormProps } from './parzelle-form'
 
-export {
-  AntragForm,
-  type AntragFormProps
-} from './antrag-form'
+export { default as AntragForm, type AntragFormProps } from './antrag-form'
 
 // =============================================================================
 // FORM HOOKS
